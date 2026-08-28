@@ -18,6 +18,7 @@ const { createJsonStore } = require("../../storage");
 const REQUEST_BUTTON_ID = "inactivity:request";
 const REMOVE_BUTTON_ID = "inactivity:remove";
 const SUBMIT_MODAL_ID = "inactivity:submit";
+const TYPE_SELECT_ID = "inactivity:type:select";
 const DATE_YEAR_ID = "inactivity:date:year";
 const DATE_MONTH_ID = "inactivity:date:month";
 const DATE_DAY_ID = "inactivity:date:day";
@@ -170,21 +171,24 @@ function register(client, rootConfig) {
       .setTitle("Solicitar inactividad")
       .addLabelComponents(
         new LabelBuilder()
-          .setLabel("Tipo de Inactividad")
-          .setStringSelectMenuComponent(new StringSelectMenuBuilder()
-            .setCustomId("type")
-            .setPlaceholder("Selecciona Total o Parcial")
-            .addOptions(
-              new StringSelectMenuOptionBuilder().setLabel("Total").setValue("total"),
-              new StringSelectMenuOptionBuilder().setLabel("Parcial").setValue("parcial")
-            )),
-        new LabelBuilder()
           .setLabel("Nombre IC")
           .setTextInputComponent(new TextInputBuilder().setCustomId("icName").setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80)),
         new LabelBuilder()
           .setLabel("Razón")
           .setTextInputComponent(new TextInputBuilder().setCustomId("reason").setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(500))
       );
+  }
+
+  function buildTypePicker() {
+    return new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(TYPE_SELECT_ID)
+        .setPlaceholder("Selecciona Total o Parcial")
+        .addOptions(
+          new StringSelectMenuOptionBuilder().setLabel("Total").setValue("total"),
+          new StringSelectMenuOptionBuilder().setLabel("Parcial").setValue("parcial")
+        )
+    );
   }
 
   function buildDatePicker(session) {
@@ -296,21 +300,18 @@ function register(client, rootConfig) {
   }
 
   async function handleDetailsSubmission(interaction) {
-    const type = normalizeType(interaction.fields.getStringSelectValues("type")[0]);
+    const session = dateSessions.get(interaction.user.id);
+    if (!session?.type) return interaction.reply({ content: "La selección ha caducado. Vuelve a pulsar SOLICITAR INACTIVIDAD.", ephemeral: true });
+    const type = session.type;
     const icName = interaction.fields.getTextInputValue("icName").trim();
     const reason = interaction.fields.getTextInputValue("reason").trim();
     if (!type) return interaction.reply({ content: "El tipo debe ser Total o Parcial.", ephemeral: true });
 
     const today = dateKey(new Date(), rootConfig.timezone);
-    const session = {
-      type,
-      icName,
-      reason,
-      stage: "start",
-      minimumDate: today,
-      selectedDate: today,
+    Object.assign(session, {
+      icName, reason, stage: "start", minimumDate: today, selectedDate: today,
       dayPage: dateParts(today).day >= 25 ? 2 : 1
-    };
+    });
     dateSessions.set(interaction.user.id, session);
     await interaction.reply({
       content: datePickerContent(session),
@@ -320,7 +321,13 @@ function register(client, rootConfig) {
   }
 
   async function handleRequest(interaction) {
-    if (!isWeekend(rootConfig.timezone)) return interaction.showModal(buildModal());
+    if (!isWeekend(rootConfig.timezone)) {
+      return interaction.reply({
+        content: "Selecciona el tipo de inactividad:",
+        components: [buildTypePicker()],
+        ephemeral: true
+      });
+    }
     const channel = await notificationChannel();
     const message = "¡Lo siento, pero las inactividades no se solicitan en findes de semanas!";
     await channel.send({
@@ -328,6 +335,13 @@ function register(client, rootConfig) {
       allowedMentions: { users: [interaction.user.id] }
     });
     await interaction.reply({ content: message, ephemeral: true });
+  }
+
+  async function handleTypeSelection(interaction) {
+    const type = normalizeType(interaction.values[0]);
+    if (!type) return interaction.reply({ content: "Selecciona Total o Parcial.", ephemeral: true });
+    dateSessions.set(interaction.user.id, { type });
+    await interaction.showModal(buildModal());
   }
 
   async function finishDateSelection(interaction, session) {
@@ -476,6 +490,7 @@ function register(client, rootConfig) {
       if (interaction.isButton() && interaction.customId === REQUEST_BUTTON_ID) return handleRequest(interaction);
       if (interaction.isButton() && interaction.customId === REMOVE_BUTTON_ID) return removeInactivity(interaction);
       if (interaction.isModalSubmit() && interaction.customId === SUBMIT_MODAL_ID) return handleDetailsSubmission(interaction);
+      if (interaction.isStringSelectMenu() && interaction.customId === TYPE_SELECT_ID) return handleTypeSelection(interaction);
       if (interaction.isStringSelectMenu() && [DATE_YEAR_ID, DATE_MONTH_ID, DATE_DAY_ID].includes(interaction.customId)) return handleDateComponent(interaction);
       if (interaction.isButton() && [DATE_CONFIRM_ID, DATE_INDEFINITE_ID].includes(interaction.customId)) return handleDateComponent(interaction);
       if (interaction.isChatInputCommand() && interaction.commandName === "inactividades") return listEntries(interaction);
