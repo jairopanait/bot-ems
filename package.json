@@ -1,0 +1,19 @@
+{
+  "name": "bot-ems",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BOT EMS: cumpleaños, postulaciones y gestión de salidas de facción en un único bot modular.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "deploy": "node src/deploy-commands.js",
+    "check": "node --check src/index.js && node --check src/deploy-commands.js && node --check src/features/birthdays/index.js && node --check src/features/postulations/index.js && node --check src/features/faction/index.js"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "discord.js": "^14.26.6",
+    "dotenv": "^17.2.3",
+    "node-cron": "^4.6.0"
+  },
+  "overrides": { "undici": "6.28.0" }
+}
