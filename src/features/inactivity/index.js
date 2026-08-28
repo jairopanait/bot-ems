@@ -321,7 +321,10 @@ function register(client, rootConfig) {
   }
 
   async function handleRequest(interaction) {
-    if (!isWeekend(rootConfig.timezone)) {
+    const guild = await client.guilds.fetch(rootConfig.guildId);
+    const member = await guild.members.fetch(interaction.user.id).catch(() => null);
+    const canTestOnWeekends = member?.roles.cache.has(config.viewerRoleId) === true;
+    if (!isWeekend(rootConfig.timezone) || canTestOnWeekends) {
       return interaction.reply({
         content: "Selecciona el tipo de inactividad:",
         components: [buildTypePicker()],
