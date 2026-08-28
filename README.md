@@ -3,7 +3,7 @@
 Un único bot de Discord que reúne los tres proyectos originales:
 
 - Cumpleaños: registro por mensaje y `/cumple`, consulta, borrado y felicitación automática.
-- Postulaciones EMS: aprobación/rechazo escrito y oral, anuncios, roles e intentos.
+- Postulaciones EMS: admisión escrita, instrucción aprobada o suspensa, anuncios y gestión de roles.
 - Salidas de facción: procesa usuarios mencionados, ajusta roles/apodo y publica la plantilla.
 - Inactividades: panel interactivo, roles automáticos, vencimientos y consulta de solicitudes vigentes.
 
