@@ -11,10 +11,10 @@ const commands = [
       { name: "Edad mínima insuficiente", value: "edad" },
       { name: "Plantilla mal rellenada", value: "plantilla" }
     )),
-  new SlashCommandBuilder().setName("aceptaroral").setDescription("Aprueba la entrevista oral de un usuario.")
+  new SlashCommandBuilder().setName("instruccionaprobada").setDescription("Aprueba la instrucción de un usuario.")
     .addUserOption((option) => option.setName("usuario").setDescription("Usuario aprobado.").setRequired(true)),
-  new SlashCommandBuilder().setName("rechazaroral").setDescription("Rechaza la entrevista oral de un usuario.")
-    .addUserOption((option) => option.setName("usuario").setDescription("Usuario rechazado.").setRequired(true))
+  new SlashCommandBuilder().setName("instruccionsuspensa").setDescription("Suspende la instrucción de un usuario.")
+    .addUserOption((option) => option.setName("usuario").setDescription("Usuario suspenso.").setRequired(true))
 ];
 
 const HEART = "<:corazon:1325652660556267580>";
@@ -69,7 +69,7 @@ function register(client, rootConfig) {
     if (command === "aceptarescrita") {
       await requireAnyRole(interaction, config.writtenCommandRoleIds);
       await addRoles(member, config.writtenApprovedRoleIds);
-      await announce(`${HEART} ${HEART} ${member} **POSTULACIÓN ESCRITA APROBADA** ${HEART} ${HEART}\n\n${EMS} **Contacta con <@&${config.emsMentionRoleId}> para hacer el examen oral.**\n\n${HEART} **Gracias por querer formar parte de EMS.**`);
+      await announce(`${HEART} **¡Felicidades ${member}, su postulación escrita ha sido admitida!**\n\n${EMS} Por el canal correspondiente, **un <@&${config.emsMentionRoleId}> se pondrá en contacto** para establecer una **hora de instrucción**.`);
       return interaction.editReply(`${HEART} **Postulación escrita aprobada** para ${member}.`);
     }
     if (command === "rechazarpostulacion") {
@@ -84,18 +84,16 @@ function register(client, rootConfig) {
       await announce(`${HEART} ${member} **POSTULACIÓN ESCRITA SUSPENSA** ${HEART}\n\n${reasons[interaction.options.getString("motivo", true)]}`);
       return interaction.editReply(`${HEART} **Postulación escrita rechazada** para ${member}.\n\n${EMS} **Rechazo escrito número ${attempt}.**`);
     }
-    if (command === "aceptaroral") {
+    if (command === "instruccionaprobada") {
       await requireAnyRole(interaction, config.oralCommandRoleIds);
       await removeRoles(member, config.oralApprovalRemoveRoleIds);
       await addRoles(member, config.oralApprovedRoleIds);
-      await announce(`${HEART} ${EMS} ${member} **POSTULACIÓN ORAL APROBADA** ${EMS} ${HEART}\n\n${HEART} **¡Felicidades! Bienvenido a EMS.**\n${HEART} **Nos encanta tenerte con nosotros. Mucha suerte en esta nueva etapa.**`);
-      return interaction.editReply(`${HEART} **Entrevista oral aprobada** para ${member}.`);
+      await announce(`${HEART} **¡Felicidades ${member} por aprobar su instrucción!**\n\n${EMS} **Bienvenido al cuerpo de EMS.**`);
+      return interaction.editReply(`${HEART} **Instrucción aprobada** para ${member}.`);
     }
     await requireAnyRole(interaction, config.oralCommandRoleIds);
-    const attempt = incrementRejection("oral", member.id);
-    await addRoles(member, [attemptRole(config.oralRejectedAttemptRoleIds, attempt)]);
-    await announce(`${HEART} ${member} **ENTREVISTA ORAL SUSPENSA** ${HEART}\n\n${EMS} **Inténtalo de nuevo en 24h.**\n${HEART} **No te desanimes, puedes prepararte y volver con más fuerza.**`);
-    return interaction.editReply(`${HEART} **Entrevista oral rechazada** para ${member}.\n\n${EMS} **Rechazo oral número ${attempt}.**`);
+    await announce(`${EMS} **¡Lo sentimos, ${member}, no consiguió aprobar esta instrucción!**\n\n${HEART} **En la siguiente será. ¡ÁNIMO!**`);
+    return interaction.editReply(`${HEART} **Instrucción suspensa** para ${member}. No se ha añadido ningún rol.`);
   }
 
   client.on(Events.InteractionCreate, async (interaction) => {

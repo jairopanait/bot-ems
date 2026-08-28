@@ -3,8 +3,9 @@
 Un único bot de Discord que reúne los tres proyectos originales:
 
 - Cumpleaños: registro por mensaje y `/cumple`, consulta, borrado y felicitación automática.
-- Postulaciones EMS: aprobación/rechazo escrito y oral, anuncios, roles e intentos.
+- Postulaciones EMS: admisión escrita, instrucción aprobada o suspensa, anuncios y gestión de roles.
 - Salidas de facción: procesa usuarios mencionados, ajusta roles/apodo y publica la plantilla.
+- Inactividades: panel interactivo, roles automáticos, vencimientos y consulta de solicitudes vigentes.
 
 ## Puesta en marcha
 
@@ -46,6 +47,19 @@ Después importa el módulo en `src/index.js`. Si incluye comandos, añádelo ta
 ## Permisos necesarios
 
 BOT EMS necesita ver canales, enviar mensajes, añadir reacciones, leer historial, gestionar roles y gestionar apodos. El rol del bot debe estar por encima de todos los roles que deba añadir o retirar.
+
+## Inactividades
+
+Al arrancar, el bot publica una sola vez el panel **SOLICITAR INACTIVIDAD** en el canal configurado. El tipo se elige en un desplegable y las fechas se seleccionan sin escribir mediante desplegables de año, mes y día: primero la fecha inicial y después la final. La fecha inicial puede ser futura; el rol se añade al llegar ese día y se retira a las 10:00 (hora de Madrid) del día posterior a la fecha final. Los sábados y domingos no se admiten nuevas solicitudes y el bot publica un aviso mencionando al usuario, salvo para miembros con el rol de consulta, que pueden realizar pruebas cualquier día.
+
+El botón **ELIMINAR MI INACTIVIDAD** permite que cada usuario retire su propia solicitud, elimina el rol aplicado y publica un aviso en el canal de notificaciones.
+
+- `Total`: duración máxima de un mes natural.
+- `Parcial`: aplica el rol parcial durante todo el intervalo.
+- `Parcial indefinida`: después de elegir la fecha de inicio, permite dejar la solicitud sin fecha final hasta que el usuario la retire manualmente.
+- `/inactividades`: lista privada para miembros con el rol de consulta configurado.
+
+Los registros se guardan en `data/inactivities.json` o en el volumen persistente indicado por `DATA_DIR`.
 
 ## Comprobaciones
 
