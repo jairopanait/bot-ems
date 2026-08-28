@@ -52,6 +52,8 @@ BOT EMS necesita ver canales, enviar mensajes, añadir reacciones, leer historia
 
 Al arrancar, el bot publica una sola vez el panel **SOLICITAR INACTIVIDAD** en el canal configurado. El campo `Tiempo` acepta un intervalo con el formato `dd/mm/aaaa - dd/mm/aaaa`. La fecha inicial puede ser futura; el rol se añade al llegar ese día y se retira a las 10:00 (hora de Madrid) del día posterior a la fecha final.
 
+El botón **ELIMINAR MI INACTIVIDAD** permite que cada usuario retire su propia solicitud, elimina el rol aplicado y publica un aviso en el canal de notificaciones.
+
 - `Total`: duración máxima de un mes natural.
 - `Parcial`: aplica el rol parcial durante todo el intervalo.
 - `/inactividades`: lista privada para miembros con el rol de consulta configurado.
