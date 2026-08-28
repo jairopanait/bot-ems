@@ -4,8 +4,11 @@ const {
   ButtonStyle,
   EmbedBuilder,
   Events,
+  LabelBuilder,
   ModalBuilder,
   SlashCommandBuilder,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
   TextInputBuilder,
   TextInputStyle
 } = require("discord.js");
@@ -15,6 +18,10 @@ const { createJsonStore } = require("../../storage");
 const REQUEST_BUTTON_ID = "inactivity:request";
 const REMOVE_BUTTON_ID = "inactivity:remove";
 const SUBMIT_MODAL_ID = "inactivity:submit";
+const DATE_SELECT_ID = "inactivity:date:select";
+const DATE_PREVIOUS_ID = "inactivity:date:previous";
+const DATE_NEXT_ID = "inactivity:date:next";
+const DATE_CONFIRM_ID = "inactivity:date:confirm";
 
 const commands = [
   new SlashCommandBuilder()
@@ -80,6 +87,11 @@ function dayAfter(key) {
   return date.toISOString().slice(0, 10);
 }
 
+function addDays(key, amount) {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + amount)).toISOString().slice(0, 10);
+}
+
 function exceedsOneCalendarMonth(start, end) {
   const year = start.date.getUTCFullYear();
   const month = start.date.getUTCMonth();
@@ -99,6 +111,7 @@ function normalizeType(value) {
 function register(client, rootConfig) {
   const config = rootConfig.inactivity;
   const store = createJsonStore(rootConfig.dataDir, "inactivities.json", { panelMessageId: null, entries: {} });
+  const dateSessions = new Map();
 
   async function notificationChannel() {
     const channel = await client.channels.fetch(config.notificationChannelId);
@@ -136,12 +149,65 @@ function register(client, rootConfig) {
     return new ModalBuilder()
       .setCustomId(SUBMIT_MODAL_ID)
       .setTitle("Solicitar inactividad")
-      .addComponents(
-        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("type").setLabel("Tipo de Inactividad (Total/Parcial)").setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(7)),
-        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("icName").setLabel("Nombre IC").setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80)),
-        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("reason").setLabel("Razón").setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(500)),
-        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("time").setLabel("Tiempo").setPlaceholder("01/09/2026 - 15/09/2026").setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(30))
+      .addLabelComponents(
+        new LabelBuilder()
+          .setLabel("Tipo de Inactividad")
+          .setStringSelectMenuComponent(new StringSelectMenuBuilder()
+            .setCustomId("type")
+            .setPlaceholder("Selecciona Total o Parcial")
+            .addOptions(
+              new StringSelectMenuOptionBuilder().setLabel("Total").setValue("total"),
+              new StringSelectMenuOptionBuilder().setLabel("Parcial").setValue("parcial")
+            )),
+        new LabelBuilder()
+          .setLabel("Nombre IC")
+          .setTextInputComponent(new TextInputBuilder().setCustomId("icName").setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80)),
+        new LabelBuilder()
+          .setLabel("Razón")
+          .setTextInputComponent(new TextInputBuilder().setCustomId("reason").setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(500))
       );
+  }
+
+  function dateLabel(key) {
+    const [year, month, day] = key.split("-").map(Number);
+    const weekday = new Intl.DateTimeFormat("es-ES", { weekday: "short", timeZone: "UTC" })
+      .format(new Date(Date.UTC(year, month - 1, day)));
+    return `${weekday} ${formatKey(key)}`;
+  }
+
+  function buildDatePicker(session) {
+    const options = [];
+    for (let index = 0; index < 25; index += 1) {
+      const key = addDays(session.pageStart, index);
+      options.push(new StringSelectMenuOptionBuilder()
+        .setLabel(dateLabel(key))
+        .setValue(key)
+        .setDefault(key === session.selectedDate));
+    }
+    const selectRow = new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(DATE_SELECT_ID)
+        .setPlaceholder("Selecciona una fecha")
+        .addOptions(options)
+    );
+    const buttons = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(DATE_PREVIOUS_ID)
+        .setLabel("25 días anteriores")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(session.pageStart <= session.minimumDate),
+      new ButtonBuilder().setCustomId(DATE_NEXT_ID).setLabel("25 días siguientes").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(DATE_CONFIRM_ID)
+        .setLabel(session.stage === "start" ? "Confirmar inicio" : "Confirmar final")
+        .setStyle(ButtonStyle.Success)
+    );
+    return [selectRow, buttons];
+  }
+
+  function datePickerContent(session) {
+    const step = session.stage === "start" ? "1/2 — Fecha de inicio" : "2/2 — Fecha de finalización";
+    return `**${step}**\nFecha seleccionada: **${formatKey(session.selectedDate)}**`;
   }
 
   async function applyRole(entry) {
@@ -186,35 +252,63 @@ function register(client, rootConfig) {
     if (changed) store.write(data);
   }
 
-  async function handleSubmission(interaction) {
-    const type = normalizeType(interaction.fields.getTextInputValue("type"));
+  async function handleDetailsSubmission(interaction) {
+    const type = normalizeType(interaction.fields.getStringSelectValues("type")[0]);
     const icName = interaction.fields.getTextInputValue("icName").trim();
     const reason = interaction.fields.getTextInputValue("reason").trim();
-    const range = parseRange(interaction.fields.getTextInputValue("time"));
     if (!type) return interaction.reply({ content: "El tipo debe ser Total o Parcial.", ephemeral: true });
-    if (!range) return interaction.reply({ content: "Tiempo debe usar el formato `dd/mm/aaaa - dd/mm/aaaa` y la fecha final no puede ser anterior.", ephemeral: true });
 
     const today = dateKey(new Date(), rootConfig.timezone);
-    if (range.end.key < today) return interaction.reply({ content: "La inactividad no puede terminar en una fecha pasada.", ephemeral: true });
-    if (type === "total" && exceedsOneCalendarMonth(range.start, range.end)) {
+    const session = {
+      type,
+      icName,
+      reason,
+      stage: "start",
+      minimumDate: today,
+      pageStart: today,
+      selectedDate: today
+    };
+    dateSessions.set(interaction.user.id, session);
+    await interaction.reply({
+      content: datePickerContent(session),
+      components: buildDatePicker(session),
+      ephemeral: true
+    });
+  }
+
+  async function finishDateSelection(interaction, session) {
+    if (session.stage === "start") {
+      session.startDate = session.selectedDate;
+      session.stage = "end";
+      session.minimumDate = session.startDate;
+      session.pageStart = session.startDate;
+      session.selectedDate = session.startDate;
+      return interaction.update({ content: datePickerContent(session), components: buildDatePicker(session) });
+    }
+
+    const start = parseSpanishDate(formatKey(session.startDate));
+    const end = parseSpanishDate(formatKey(session.selectedDate));
+    if (session.type === "total" && exceedsOneCalendarMonth(start, end)) {
       const channel = await notificationChannel();
       await channel.send({
         content: `<@${interaction.user.id}> ¡Lo sentimos. supera su inactividad total más de un mes, abra ticket para hablarlo con directiva!`,
         allowedMentions: { users: [interaction.user.id] }
       });
-      return interaction.reply({ content: "La inactividad total supera un mes. Se ha enviado el aviso correspondiente.", ephemeral: true });
+      dateSessions.delete(interaction.user.id);
+      return interaction.update({ content: "La inactividad total supera un mes. Se ha enviado el aviso correspondiente.", components: [] });
     }
 
+    const today = dateKey(new Date(), rootConfig.timezone);
     const data = store.read();
     const entry = {
       userId: interaction.user.id,
       discordName: interaction.user.tag,
-      icName,
-      reason,
-      type,
-      startDate: range.start.key,
-      endDate: range.end.key,
-      cleanupDate: dayAfter(range.end.key),
+      icName: session.icName,
+      reason: session.reason,
+      type: session.type,
+      startDate: session.startDate,
+      endDate: session.selectedDate,
+      cleanupDate: dayAfter(session.selectedDate),
       roleApplied: false,
       finished: false,
       requestedAt: new Date().toISOString()
@@ -222,10 +316,33 @@ function register(client, rootConfig) {
     data.entries[interaction.user.id] = entry;
     if (entry.startDate <= today) await applyRole(entry);
     store.write(data);
-    await interaction.reply({
-      content: `Inactividad ${type} registrada del ${formatKey(entry.startDate)} al ${formatKey(entry.endDate)}. El rol se retirará el ${formatKey(entry.cleanupDate)} a las 10:00.`,
-      ephemeral: true
+    dateSessions.delete(interaction.user.id);
+    await interaction.update({
+      content: `Inactividad ${entry.type} registrada del ${formatKey(entry.startDate)} al ${formatKey(entry.endDate)}. El rol se retirará el ${formatKey(entry.cleanupDate)} a las 10:00.`,
+      components: []
     });
+  }
+
+  async function handleDateComponent(interaction) {
+    const session = dateSessions.get(interaction.user.id);
+    if (!session) return interaction.reply({ content: "Esta selección ha caducado. Vuelve a abrir el formulario.", ephemeral: true });
+
+    if (interaction.isStringSelectMenu()) {
+      session.selectedDate = interaction.values[0];
+      return interaction.update({ content: datePickerContent(session), components: buildDatePicker(session) });
+    }
+    if (interaction.customId === DATE_PREVIOUS_ID) {
+      const candidate = addDays(session.pageStart, -25);
+      session.pageStart = candidate < session.minimumDate ? session.minimumDate : candidate;
+      session.selectedDate = session.pageStart;
+      return interaction.update({ content: datePickerContent(session), components: buildDatePicker(session) });
+    }
+    if (interaction.customId === DATE_NEXT_ID) {
+      session.pageStart = addDays(session.pageStart, 25);
+      session.selectedDate = session.pageStart;
+      return interaction.update({ content: datePickerContent(session), components: buildDatePicker(session) });
+    }
+    return finishDateSelection(interaction, session);
   }
 
   async function removeInactivity(interaction) {
@@ -283,7 +400,9 @@ function register(client, rootConfig) {
     try {
       if (interaction.isButton() && interaction.customId === REQUEST_BUTTON_ID) return interaction.showModal(buildModal());
       if (interaction.isButton() && interaction.customId === REMOVE_BUTTON_ID) return removeInactivity(interaction);
-      if (interaction.isModalSubmit() && interaction.customId === SUBMIT_MODAL_ID) return handleSubmission(interaction);
+      if (interaction.isModalSubmit() && interaction.customId === SUBMIT_MODAL_ID) return handleDetailsSubmission(interaction);
+      if (interaction.isStringSelectMenu() && interaction.customId === DATE_SELECT_ID) return handleDateComponent(interaction);
+      if (interaction.isButton() && [DATE_PREVIOUS_ID, DATE_NEXT_ID, DATE_CONFIRM_ID].includes(interaction.customId)) return handleDateComponent(interaction);
       if (interaction.isChatInputCommand() && interaction.commandName === "inactividades") return listEntries(interaction);
     } catch (error) {
       console.error("Error en inactividades:", error);
