@@ -5,6 +5,7 @@ Un único bot de Discord que reúne los tres proyectos originales:
 - Cumpleaños: registro por mensaje y `/cumple`, consulta, borrado y felicitación automática.
 - Postulaciones EMS: aprobación/rechazo escrito y oral, anuncios, roles e intentos.
 - Salidas de facción: procesa usuarios mencionados, ajusta roles/apodo y publica la plantilla.
+- Inactividades: panel interactivo, roles automáticos, vencimientos y consulta de solicitudes vigentes.
 
 ## Puesta en marcha
 
@@ -46,6 +47,16 @@ Después importa el módulo en `src/index.js`. Si incluye comandos, añádelo ta
 ## Permisos necesarios
 
 BOT EMS necesita ver canales, enviar mensajes, añadir reacciones, leer historial, gestionar roles y gestionar apodos. El rol del bot debe estar por encima de todos los roles que deba añadir o retirar.
+
+## Inactividades
+
+Al arrancar, el bot publica una sola vez el panel **SOLICITAR INACTIVIDAD** en el canal configurado. El campo `Tiempo` acepta un intervalo con el formato `dd/mm/aaaa - dd/mm/aaaa`. La fecha inicial puede ser futura; el rol se añade al llegar ese día y se retira a las 10:00 (hora de Madrid) del día posterior a la fecha final.
+
+- `Total`: duración máxima de un mes natural.
+- `Parcial`: aplica el rol parcial durante todo el intervalo.
+- `/inactividades`: lista privada para miembros con el rol de consulta configurado.
+
+Los registros se guardan en `data/inactivities.json` o en el volumen persistente indicado por `DATA_DIR`.
 
 ## Comprobaciones
 
