@@ -18,10 +18,11 @@ const { createJsonStore } = require("../../storage");
 const REQUEST_BUTTON_ID = "inactivity:request";
 const REMOVE_BUTTON_ID = "inactivity:remove";
 const SUBMIT_MODAL_ID = "inactivity:submit";
-const DATE_SELECT_ID = "inactivity:date:select";
-const DATE_PREVIOUS_ID = "inactivity:date:previous";
-const DATE_NEXT_ID = "inactivity:date:next";
+const DATE_YEAR_ID = "inactivity:date:year";
+const DATE_MONTH_ID = "inactivity:date:month";
+const DATE_DAY_ID = "inactivity:date:day";
 const DATE_CONFIRM_ID = "inactivity:date:confirm";
+const DATE_INDEFINITE_ID = "inactivity:date:indefinite";
 
 const commands = [
   new SlashCommandBuilder()
@@ -90,6 +91,24 @@ function dayAfter(key) {
 function addDays(key, amount) {
   const [year, month, day] = key.split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, day + amount)).toISOString().slice(0, 10);
+}
+
+function daysInMonth(year, month) {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+function dateParts(key) {
+  const [year, month, day] = key.split("-").map(Number);
+  return { year, month, day };
+}
+
+function keyFromParts(year, month, day) {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function isWeekend(timezone) {
+  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: timezone, weekday: "short" }).format(new Date());
+  return weekday === "Sat" || weekday === "Sun";
 }
 
 function exceedsOneCalendarMonth(start, end) {
@@ -168,41 +187,65 @@ function register(client, rootConfig) {
       );
   }
 
-  function dateLabel(key) {
-    const [year, month, day] = key.split("-").map(Number);
-    const weekday = new Intl.DateTimeFormat("es-ES", { weekday: "short", timeZone: "UTC" })
-      .format(new Date(Date.UTC(year, month - 1, day)));
-    return `${weekday} ${formatKey(key)}`;
-  }
-
   function buildDatePicker(session) {
-    const options = [];
-    for (let index = 0; index < 25; index += 1) {
-      const key = addDays(session.pageStart, index);
-      options.push(new StringSelectMenuOptionBuilder()
-        .setLabel(dateLabel(key))
-        .setValue(key)
-        .setDefault(key === session.selectedDate));
+    const selected = dateParts(session.selectedDate);
+    const minimum = dateParts(session.minimumDate);
+    const yearOptions = [];
+    for (let year = minimum.year; year <= minimum.year + 5; year += 1) {
+      yearOptions.push(new StringSelectMenuOptionBuilder()
+        .setLabel(String(year)).setValue(String(year)).setDefault(year === selected.year));
     }
-    const selectRow = new ActionRowBuilder().addComponents(
+    const monthOptions = [];
+    for (let month = 1; month <= 12; month += 1) {
+      const label = new Intl.DateTimeFormat("es-ES", { month: "long", timeZone: "UTC" })
+        .format(new Date(Date.UTC(2026, month - 1, 1)));
+      monthOptions.push(new StringSelectMenuOptionBuilder()
+        .setLabel(label.charAt(0).toUpperCase() + label.slice(1))
+        .setValue(String(month))
+        .setDefault(month === selected.month));
+    }
+    const maximumDay = daysInMonth(selected.year, selected.month);
+    const dayOptions = [];
+    if (session.dayPage === 2) {
+      dayOptions.push(new StringSelectMenuOptionBuilder().setLabel("← Días 1–24").setValue("back"));
+      for (let day = 25; day <= maximumDay; day += 1) {
+        dayOptions.push(new StringSelectMenuOptionBuilder()
+          .setLabel(String(day)).setValue(String(day)).setDefault(day === selected.day));
+      }
+    } else {
+      for (let day = 1; day <= Math.min(24, maximumDay); day += 1) {
+        dayOptions.push(new StringSelectMenuOptionBuilder()
+          .setLabel(String(day)).setValue(String(day)).setDefault(day === selected.day));
+      }
+      if (maximumDay >= 25) dayOptions.push(new StringSelectMenuOptionBuilder().setLabel("Días 25–31 →").setValue("more"));
+    }
+    const yearRow = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
-        .setCustomId(DATE_SELECT_ID)
-        .setPlaceholder("Selecciona una fecha")
-        .addOptions(options)
+        .setCustomId(DATE_YEAR_ID).setPlaceholder("Selecciona el año").addOptions(yearOptions)
+    );
+    const monthRow = new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(DATE_MONTH_ID).setPlaceholder("Selecciona el mes").addOptions(monthOptions)
+    );
+    const dayRow = new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(DATE_DAY_ID).setPlaceholder("Selecciona el día").addOptions(dayOptions)
     );
     const buttons = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(DATE_PREVIOUS_ID)
-        .setLabel("25 días anteriores")
-        .setStyle(ButtonStyle.Secondary)
-        .setDisabled(session.pageStart <= session.minimumDate),
-      new ButtonBuilder().setCustomId(DATE_NEXT_ID).setLabel("25 días siguientes").setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
         .setCustomId(DATE_CONFIRM_ID)
         .setLabel(session.stage === "start" ? "Confirmar inicio" : "Confirmar final")
         .setStyle(ButtonStyle.Success)
     );
-    return [selectRow, buttons];
+    if (session.stage === "end" && session.type === "parcial") {
+      buttons.addComponents(
+        new ButtonBuilder()
+          .setCustomId(DATE_INDEFINITE_ID)
+          .setLabel("INDEFINIDA")
+          .setStyle(ButtonStyle.Primary)
+      );
+    }
+    return [yearRow, monthRow, dayRow, buttons];
   }
 
   function datePickerContent(session) {
@@ -244,7 +287,7 @@ function register(client, rootConfig) {
         await applyRole(entry);
         changed = true;
       }
-      if (now.date > entry.cleanupDate || (now.date === entry.cleanupDate && now.hour >= 10)) {
+      if (entry.cleanupDate && (now.date > entry.cleanupDate || (now.date === entry.cleanupDate && now.hour >= 10))) {
         await finishEntry(entry);
         changed = true;
       }
@@ -265,8 +308,8 @@ function register(client, rootConfig) {
       reason,
       stage: "start",
       minimumDate: today,
-      pageStart: today,
-      selectedDate: today
+      selectedDate: today,
+      dayPage: dateParts(today).day >= 25 ? 2 : 1
     };
     dateSessions.set(interaction.user.id, session);
     await interaction.reply({
@@ -276,18 +319,29 @@ function register(client, rootConfig) {
     });
   }
 
+  async function handleRequest(interaction) {
+    if (!isWeekend(rootConfig.timezone)) return interaction.showModal(buildModal());
+    const channel = await notificationChannel();
+    const message = "¡Lo siento, pero las inactividades no se solicitan en findes de semanas!";
+    await channel.send({
+      content: `<@${interaction.user.id}> ${message}`,
+      allowedMentions: { users: [interaction.user.id] }
+    });
+    await interaction.reply({ content: message, ephemeral: true });
+  }
+
   async function finishDateSelection(interaction, session) {
     if (session.stage === "start") {
       session.startDate = session.selectedDate;
       session.stage = "end";
       session.minimumDate = session.startDate;
-      session.pageStart = session.startDate;
       session.selectedDate = session.startDate;
+      session.dayPage = dateParts(session.startDate).day >= 25 ? 2 : 1;
       return interaction.update({ content: datePickerContent(session), components: buildDatePicker(session) });
     }
 
     const start = parseSpanishDate(formatKey(session.startDate));
-    const end = parseSpanishDate(formatKey(session.selectedDate));
+    const end = session.indefinite ? null : parseSpanishDate(formatKey(session.selectedDate));
     if (session.type === "total" && exceedsOneCalendarMonth(start, end)) {
       const channel = await notificationChannel();
       await channel.send({
@@ -307,8 +361,9 @@ function register(client, rootConfig) {
       reason: session.reason,
       type: session.type,
       startDate: session.startDate,
-      endDate: session.selectedDate,
-      cleanupDate: dayAfter(session.selectedDate),
+      endDate: session.indefinite ? null : session.selectedDate,
+      cleanupDate: session.indefinite ? null : dayAfter(session.selectedDate),
+      indefinite: session.indefinite === true,
       roleApplied: false,
       finished: false,
       requestedAt: new Date().toISOString()
@@ -317,8 +372,11 @@ function register(client, rootConfig) {
     if (entry.startDate <= today) await applyRole(entry);
     store.write(data);
     dateSessions.delete(interaction.user.id);
+    const confirmation = entry.indefinite
+      ? `Inactividad parcial indefinida registrada desde el ${formatKey(entry.startDate)}. El rol permanecerá hasta que retires tu inactividad.`
+      : `Inactividad ${entry.type} registrada del ${formatKey(entry.startDate)} al ${formatKey(entry.endDate)}. El rol se retirará el ${formatKey(entry.cleanupDate)} a las 10:00.`;
     await interaction.update({
-      content: `Inactividad ${entry.type} registrada del ${formatKey(entry.startDate)} al ${formatKey(entry.endDate)}. El rol se retirará el ${formatKey(entry.cleanupDate)} a las 10:00.`,
+      content: confirmation,
       components: []
     });
   }
@@ -328,19 +386,36 @@ function register(client, rootConfig) {
     if (!session) return interaction.reply({ content: "Esta selección ha caducado. Vuelve a abrir el formulario.", ephemeral: true });
 
     if (interaction.isStringSelectMenu()) {
-      session.selectedDate = interaction.values[0];
+      const value = interaction.values[0];
+      const selected = dateParts(session.selectedDate);
+      if (interaction.customId === DATE_YEAR_ID) {
+        selected.year = Number(value);
+        selected.day = Math.min(selected.day, daysInMonth(selected.year, selected.month));
+      } else if (interaction.customId === DATE_MONTH_ID) {
+        selected.month = Number(value);
+        selected.day = Math.min(selected.day, daysInMonth(selected.year, selected.month));
+      } else if (value === "more") {
+        session.dayPage = 2;
+        return interaction.update({ content: datePickerContent(session), components: buildDatePicker(session) });
+      } else if (value === "back") {
+        session.dayPage = 1;
+        return interaction.update({ content: datePickerContent(session), components: buildDatePicker(session) });
+      } else {
+        selected.day = Number(value);
+      }
+      session.selectedDate = keyFromParts(selected.year, selected.month, selected.day);
+      session.dayPage = selected.day >= 25 ? 2 : 1;
       return interaction.update({ content: datePickerContent(session), components: buildDatePicker(session) });
     }
-    if (interaction.customId === DATE_PREVIOUS_ID) {
-      const candidate = addDays(session.pageStart, -25);
-      session.pageStart = candidate < session.minimumDate ? session.minimumDate : candidate;
-      session.selectedDate = session.pageStart;
-      return interaction.update({ content: datePickerContent(session), components: buildDatePicker(session) });
+    if (interaction.customId === DATE_INDEFINITE_ID && session.stage === "end" && session.type === "parcial") {
+      session.indefinite = true;
+      return finishDateSelection(interaction, session);
     }
-    if (interaction.customId === DATE_NEXT_ID) {
-      session.pageStart = addDays(session.pageStart, 25);
-      session.selectedDate = session.pageStart;
-      return interaction.update({ content: datePickerContent(session), components: buildDatePicker(session) });
+    if (session.selectedDate < session.minimumDate) {
+      return interaction.update({
+        content: `${datePickerContent(session)}\n⚠️ La fecha no puede ser anterior al ${formatKey(session.minimumDate)}.`,
+        components: buildDatePicker(session)
+      });
     }
     return finishDateSelection(interaction, session);
   }
@@ -384,7 +459,7 @@ function register(client, rootConfig) {
       .setColor(0xc0392b)
       .setDescription(chunk.map((entry) =>
         `**${entry.icName}** — <@${entry.userId}> (${entry.discordName})\n` +
-        `Tipo: ${entry.type} · ${formatKey(entry.startDate)} → ${formatKey(entry.endDate)}\n` +
+        `Tipo: ${entry.type}${entry.indefinite ? " indefinida" : ""} · ${formatKey(entry.startDate)} → ${entry.indefinite ? "Sin fecha final" : formatKey(entry.endDate)}\n` +
         `Razón: ${entry.reason}`
       ).join("\n\n")));
     await interaction.reply({ embeds, ephemeral: true, allowedMentions: { parse: [] } });
@@ -398,11 +473,11 @@ function register(client, rootConfig) {
 
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
-      if (interaction.isButton() && interaction.customId === REQUEST_BUTTON_ID) return interaction.showModal(buildModal());
+      if (interaction.isButton() && interaction.customId === REQUEST_BUTTON_ID) return handleRequest(interaction);
       if (interaction.isButton() && interaction.customId === REMOVE_BUTTON_ID) return removeInactivity(interaction);
       if (interaction.isModalSubmit() && interaction.customId === SUBMIT_MODAL_ID) return handleDetailsSubmission(interaction);
-      if (interaction.isStringSelectMenu() && interaction.customId === DATE_SELECT_ID) return handleDateComponent(interaction);
-      if (interaction.isButton() && [DATE_PREVIOUS_ID, DATE_NEXT_ID, DATE_CONFIRM_ID].includes(interaction.customId)) return handleDateComponent(interaction);
+      if (interaction.isStringSelectMenu() && [DATE_YEAR_ID, DATE_MONTH_ID, DATE_DAY_ID].includes(interaction.customId)) return handleDateComponent(interaction);
+      if (interaction.isButton() && [DATE_CONFIRM_ID, DATE_INDEFINITE_ID].includes(interaction.customId)) return handleDateComponent(interaction);
       if (interaction.isChatInputCommand() && interaction.commandName === "inactividades") return listEntries(interaction);
     } catch (error) {
       console.error("Error en inactividades:", error);
