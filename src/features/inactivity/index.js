@@ -13,6 +13,7 @@ const cron = require("node-cron");
 const { createJsonStore } = require("../../storage");
 
 const REQUEST_BUTTON_ID = "inactivity:request";
+const REMOVE_BUTTON_ID = "inactivity:remove";
 const SUBMIT_MODAL_ID = "inactivity:submit";
 
 const commands = [
@@ -108,18 +109,23 @@ function register(client, rootConfig) {
   async function publishPanel() {
     const channel = await client.channels.fetch(config.requestChannelId);
     if (!channel?.isTextBased()) throw new Error("El canal de solicitudes de inactividad no es válido.");
-    const data = store.read();
-    if (data.panelMessageId) {
-      const existing = await channel.messages.fetch(data.panelMessageId).catch(() => null);
-      if (existing) return;
-    }
     const embed = new EmbedBuilder()
       .setTitle("SOLICITAR INACTIVIDAD")
       .setDescription("Solicita su inactividad parcial o total.")
       .setColor(0xc0392b);
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(REQUEST_BUTTON_ID).setLabel("SOLICITAR INACTIVIDAD").setStyle(ButtonStyle.Primary)
+      new ButtonBuilder().setCustomId(REQUEST_BUTTON_ID).setLabel("SOLICITAR INACTIVIDAD").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(REMOVE_BUTTON_ID).setLabel("ELIMINAR MI INACTIVIDAD").setStyle(ButtonStyle.Danger)
     );
+    const data = store.read();
+    if (data.panelMessageId) {
+      const existing = await channel.messages.fetch(data.panelMessageId).catch(() => null);
+      if (existing) {
+        await existing.edit({ embeds: [embed], components: [row] });
+        console.log(`Panel de inactividad actualizado en el canal ${config.requestChannelId}.`);
+        return;
+      }
+    }
     const message = await channel.send({ embeds: [embed], components: [row] });
     data.panelMessageId = message.id;
     store.write(data);
@@ -222,6 +228,31 @@ function register(client, rootConfig) {
     });
   }
 
+  async function removeInactivity(interaction) {
+    const data = store.read();
+    const entry = data.entries[interaction.user.id];
+    if (!entry || entry.finished) {
+      return interaction.reply({ content: "No tienes ninguna inactividad vigente para retirar.", ephemeral: true });
+    }
+
+    const guild = await client.guilds.fetch(rootConfig.guildId);
+    const member = await guild.members.fetch(interaction.user.id).catch(() => null);
+    const roleId = entry.type === "total" ? config.totalRoleId : config.partialRoleId;
+    if (member?.roles.cache.has(roleId)) await member.roles.remove(roleId, "Inactividad retirada por el usuario");
+
+    entry.finished = true;
+    entry.cancelled = true;
+    entry.cancelledAt = new Date().toISOString();
+    store.write(data);
+
+    const channel = await notificationChannel();
+    await channel.send({
+      content: `<@${interaction.user.id}> ¡Inactividad retirada con éxito!`,
+      allowedMentions: { users: [interaction.user.id] }
+    });
+    await interaction.reply({ content: "Tu inactividad ha sido retirada correctamente.", ephemeral: true });
+  }
+
   async function listEntries(interaction) {
     const member = await interaction.guild.members.fetch(interaction.user.id);
     if (!member.roles.cache.has(config.viewerRoleId)) {
@@ -251,6 +282,7 @@ function register(client, rootConfig) {
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
       if (interaction.isButton() && interaction.customId === REQUEST_BUTTON_ID) return interaction.showModal(buildModal());
+      if (interaction.isButton() && interaction.customId === REMOVE_BUTTON_ID) return removeInactivity(interaction);
       if (interaction.isModalSubmit() && interaction.customId === SUBMIT_MODAL_ID) return handleSubmission(interaction);
       if (interaction.isChatInputCommand() && interaction.commandName === "inactividades") return listEntries(interaction);
     } catch (error) {
