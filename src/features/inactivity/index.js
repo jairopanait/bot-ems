@@ -332,7 +332,9 @@ function register(client, rootConfig) {
     const message = "¡Lo sentimos, inactividad rechazada, solicitala de Lunes a Viernes!";
     await channel.send({
       content: `<@${interaction.user.id}> ${message}`,
-      stickers: ["1389588947792822333"],
+      embeds: [new EmbedBuilder()
+        .setColor(0xc0392b)
+        .setImage("https://media.discordapp.net/stickers/1389588947792822333.webp?size=160&quality=lossless")],
       allowedMentions: { users: [interaction.user.id] }
     });
     await interaction.reply({ content: message, ephemeral: true });
