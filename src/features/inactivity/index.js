@@ -329,9 +329,10 @@ function register(client, rootConfig) {
       });
     }
     const channel = await notificationChannel();
-    const message = "¡Lo siento, pero las inactividades no se solicitan en findes de semanas!";
+    const message = "¡Lo sentimos, inactividad rechazada, solicitala de Lunes a Viernes!";
     await channel.send({
       content: `<@${interaction.user.id}> ${message}`,
+      stickers: ["1389588947792822333"],
       allowedMentions: { users: [interaction.user.id] }
     });
     await interaction.reply({ content: message, ephemeral: true });
