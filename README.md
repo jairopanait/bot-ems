@@ -6,6 +6,7 @@ Un único bot de Discord que reúne los tres proyectos originales:
 - Postulaciones EMS: admisión escrita, instrucción aprobada o suspensa, anuncios y gestión de roles.
 - Salidas de facción: procesa usuarios mencionados, ajusta roles/apodo y publica la plantilla.
 - Inactividades: panel interactivo, roles automáticos, vencimientos y consulta de solicitudes vigentes.
+- H-50: panel de entrada y salida para asignar o retirar automáticamente el rol H-50.
 
 ## Puesta en marcha
 
@@ -47,6 +48,10 @@ Después importa el módulo en `src/index.js`. Si incluye comandos, añádelo ta
 ## Permisos necesarios
 
 BOT EMS necesita ver canales, enviar mensajes, añadir reacciones, leer historial, gestionar roles y gestionar apodos. El rol del bot debe estar por encima de todos los roles que deba añadir o retirar.
+
+## H-50
+
+Al arrancar, el bot publica o actualiza un único panel en el canal configurado con los botones **Entrada H-50** y **Salida H-50**. El primero asigna el rol H-50 y el segundo lo retira. La interacción no publica respuestas ni mueve al usuario a canales de voz.
 
 ## Inactividades
 

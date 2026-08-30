@@ -50,5 +50,9 @@ module.exports = Object.freeze({
     viewerRoleId: value("INACTIVITY_VIEWER_ROLE_ID", "1135516317097660538"),
     partialRoleId: value("INACTIVITY_PARTIAL_ROLE_ID", "1133783680733679626"),
     totalRoleId: value("INACTIVITY_TOTAL_ROLE_ID", "1129103330900181123")
+  },
+  h50: {
+    panelChannelId: value("H50_PANEL_CHANNEL_ID", "1543639274103119893"),
+    roleId: value("H50_ROLE_ID", "1543639741751103609")
   }
 });

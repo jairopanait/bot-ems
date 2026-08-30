@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "deploy": "node src/deploy-commands.js",
-    "check": "node --check src/index.js && node --check src/deploy-commands.js && node --check src/features/birthdays/index.js && node --check src/features/postulations/index.js && node --check src/features/faction/index.js && node --check src/features/inactivity/index.js"
+    "check": "node --check src/index.js && node --check src/deploy-commands.js && node --check src/features/birthdays/index.js && node --check src/features/postulations/index.js && node --check src/features/faction/index.js && node --check src/features/inactivity/index.js && node --check src/features/h50/index.js"
   },
   "engines": { "node": ">=20" },
   "dependencies": {
