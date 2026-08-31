@@ -18,8 +18,10 @@ const { createJsonStore } = require("../../storage");
 const REQUEST_BUTTON_ID = "inactivity:request";
 const REMOVE_BUTTON_ID = "inactivity:remove";
 const ADMIN_REQUEST_BUTTON_ID = "inactivity:admin:request";
+const ADMIN_REMOVE_BUTTON_ID = "inactivity:admin:remove";
 const SUBMIT_MODAL_ID = "inactivity:submit";
 const ADMIN_SUBMIT_MODAL_ID = "inactivity:admin:submit";
+const ADMIN_REMOVE_MODAL_ID = "inactivity:admin:remove:submit";
 const TYPE_SELECT_ID = "inactivity:type:select";
 const ADMIN_TYPE_SELECT_ID = "inactivity:admin:type:select";
 const DATE_YEAR_ID = "inactivity:date:year";
@@ -152,7 +154,8 @@ function register(client, rootConfig) {
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(REQUEST_BUTTON_ID).setLabel("SOLICITAR INACTIVIDAD").setStyle(ButtonStyle.Primary),
       new ButtonBuilder().setCustomId(REMOVE_BUTTON_ID).setLabel("ELIMINAR MI INACTIVIDAD").setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId(ADMIN_REQUEST_BUTTON_ID).setLabel("AÑADIR INACTIVIDAD MANUAL").setStyle(ButtonStyle.Secondary)
+      new ButtonBuilder().setCustomId(ADMIN_REQUEST_BUTTON_ID).setLabel("AÑADIR INACTIVIDAD MANUAL").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(ADMIN_REMOVE_BUTTON_ID).setLabel("ELIMINAR INACTIVIDAD DE USUARIO").setStyle(ButtonStyle.Secondary)
     );
     const data = store.read();
     if (data.panelMessageId) {
@@ -197,6 +200,17 @@ function register(client, rootConfig) {
         new LabelBuilder()
           .setLabel("Razón")
           .setTextInputComponent(new TextInputBuilder().setCustomId("reason").setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(500))
+      );
+  }
+
+  function buildAdminRemoveModal() {
+    return new ModalBuilder()
+      .setCustomId(ADMIN_REMOVE_MODAL_ID)
+      .setTitle("Eliminar inactividad")
+      .addLabelComponents(
+        new LabelBuilder()
+          .setLabel("ID de Discord del usuario")
+          .setTextInputComponent(new TextInputBuilder().setCustomId("userId").setStyle(TextInputStyle.Short).setRequired(true).setMinLength(17).setMaxLength(20))
       );
   }
 
@@ -422,6 +436,49 @@ function register(client, rootConfig) {
     });
   }
 
+  async function handleAdminRemoveRequest(interaction) {
+    const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+    if (!member?.roles.cache.has(config.viewerRoleId)) {
+      return interaction.reply({ content: "No tienes permiso para eliminar inactividades de otros usuarios.", ephemeral: true });
+    }
+    await interaction.showModal(buildAdminRemoveModal());
+  }
+
+  async function handleAdminRemoveSubmission(interaction) {
+    const administrator = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+    if (!administrator?.roles.cache.has(config.viewerRoleId)) {
+      return interaction.reply({ content: "No tienes permiso para eliminar inactividades de otros usuarios.", ephemeral: true });
+    }
+
+    const userId = interaction.fields.getTextInputValue("userId").trim();
+    if (!/^\d{17,20}$/.test(userId)) {
+      return interaction.reply({ content: "El ID de Discord introducido no es válido.", ephemeral: true });
+    }
+    const data = store.read();
+    const entry = data.entries[userId];
+    if (!entry || entry.finished) {
+      return interaction.reply({ content: "Ese usuario no tiene ninguna inactividad vigente.", ephemeral: true });
+    }
+    await interaction.deferReply({ ephemeral: true });
+
+    const guild = await client.guilds.fetch(rootConfig.guildId);
+    const member = await guild.members.fetch({ user: userId, force: true }).catch(() => null);
+    const roleId = entry.type === "total" ? config.totalRoleId : config.partialRoleId;
+    if (member?.roles.cache.has(roleId)) {
+      await member.roles.remove(roleId, `Inactividad eliminada manualmente por ${interaction.user.tag}`);
+    }
+
+    delete data.entries[userId];
+    store.write(data);
+
+    const channel = await notificationChannel();
+    await channel.send({
+      content: `<@${userId}> ¡Su inactividad ${entry.type} finalizó! Para renovarla vuelva a solicitarla en el canal correspondiente.`,
+      allowedMentions: { users: [userId] }
+    });
+    await interaction.editReply({ content: `La inactividad de <@${userId}> se ha eliminado correctamente.`, allowedMentions: { parse: [] } });
+  }
+
   async function handleTypeSelection(interaction) {
     const type = normalizeType(interaction.values[0]);
     if (!type) return interaction.reply({ content: "Selecciona Total o Parcial.", ephemeral: true });
@@ -608,8 +665,10 @@ function register(client, rootConfig) {
       if (interaction.isButton() && interaction.customId === REQUEST_BUTTON_ID) return handleRequest(interaction);
       if (interaction.isButton() && interaction.customId === REMOVE_BUTTON_ID) return removeInactivity(interaction);
       if (interaction.isButton() && interaction.customId === ADMIN_REQUEST_BUTTON_ID) return handleAdminRequest(interaction);
+      if (interaction.isButton() && interaction.customId === ADMIN_REMOVE_BUTTON_ID) return handleAdminRemoveRequest(interaction);
       if (interaction.isModalSubmit() && interaction.customId === SUBMIT_MODAL_ID) return handleDetailsSubmission(interaction);
       if (interaction.isModalSubmit() && interaction.customId === ADMIN_SUBMIT_MODAL_ID) return handleAdminDetailsSubmission(interaction);
+      if (interaction.isModalSubmit() && interaction.customId === ADMIN_REMOVE_MODAL_ID) return handleAdminRemoveSubmission(interaction);
       if (interaction.isStringSelectMenu() && interaction.customId === TYPE_SELECT_ID) return handleTypeSelection(interaction);
       if (interaction.isStringSelectMenu() && interaction.customId === ADMIN_TYPE_SELECT_ID) return handleAdminTypeSelection(interaction);
       if (interaction.isStringSelectMenu() && [DATE_YEAR_ID, DATE_MONTH_ID, DATE_DAY_ID].includes(interaction.customId)) return handleDateComponent(interaction);

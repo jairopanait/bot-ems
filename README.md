@@ -65,6 +65,8 @@ Al registrar cualquier inactividad, incluida una asignación manual, el bot publ
 
 El botón **AÑADIR INACTIVIDAD MANUAL** solo puede utilizarlo el rol de consulta configurado. Permite indicar el ID de Discord del usuario, nombre IC, razón, tipo y fechas. Estas asignaciones se registran y vencen igual que las solicitudes normales, pero no tienen el límite de un mes para la inactividad total, por lo que pueden abarcar tres meses o más.
 
+El botón **ELIMINAR INACTIVIDAD DE USUARIO** está restringido al mismo rol administrativo. Solicita el ID de Discord, retira el rol de inactividad, elimina el registro y publica el aviso habitual de finalización mencionando al usuario.
+
 - `Total`: duración máxima de un mes natural.
 - `Parcial`: aplica el rol parcial durante todo el intervalo.
 - `Parcial indefinida`: después de elegir la fecha de inicio, permite dejar la solicitud sin fecha final hasta que el usuario la retire manualmente.
