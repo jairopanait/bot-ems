@@ -17,8 +17,11 @@ const { createJsonStore } = require("../../storage");
 
 const REQUEST_BUTTON_ID = "inactivity:request";
 const REMOVE_BUTTON_ID = "inactivity:remove";
+const ADMIN_REQUEST_BUTTON_ID = "inactivity:admin:request";
 const SUBMIT_MODAL_ID = "inactivity:submit";
+const ADMIN_SUBMIT_MODAL_ID = "inactivity:admin:submit";
 const TYPE_SELECT_ID = "inactivity:type:select";
+const ADMIN_TYPE_SELECT_ID = "inactivity:admin:type:select";
 const DATE_YEAR_ID = "inactivity:date:year";
 const DATE_MONTH_ID = "inactivity:date:month";
 const DATE_DAY_ID = "inactivity:date:day";
@@ -148,7 +151,8 @@ function register(client, rootConfig) {
       .setColor(0xc0392b);
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(REQUEST_BUTTON_ID).setLabel("SOLICITAR INACTIVIDAD").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(REMOVE_BUTTON_ID).setLabel("ELIMINAR MI INACTIVIDAD").setStyle(ButtonStyle.Danger)
+      new ButtonBuilder().setCustomId(REMOVE_BUTTON_ID).setLabel("ELIMINAR MI INACTIVIDAD").setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(ADMIN_REQUEST_BUTTON_ID).setLabel("AÑADIR INACTIVIDAD MANUAL").setStyle(ButtonStyle.Secondary)
     );
     const data = store.read();
     if (data.panelMessageId) {
@@ -179,10 +183,27 @@ function register(client, rootConfig) {
       );
   }
 
-  function buildTypePicker() {
+  function buildAdminModal() {
+    return new ModalBuilder()
+      .setCustomId(ADMIN_SUBMIT_MODAL_ID)
+      .setTitle("Añadir inactividad manual")
+      .addLabelComponents(
+        new LabelBuilder()
+          .setLabel("ID de Discord del usuario")
+          .setTextInputComponent(new TextInputBuilder().setCustomId("userId").setStyle(TextInputStyle.Short).setRequired(true).setMinLength(17).setMaxLength(20)),
+        new LabelBuilder()
+          .setLabel("Nombre IC")
+          .setTextInputComponent(new TextInputBuilder().setCustomId("icName").setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80)),
+        new LabelBuilder()
+          .setLabel("Razón")
+          .setTextInputComponent(new TextInputBuilder().setCustomId("reason").setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(500))
+      );
+  }
+
+  function buildTypePicker(customId = TYPE_SELECT_ID) {
     return new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
-        .setCustomId(TYPE_SELECT_ID)
+        .setCustomId(customId)
         .setPlaceholder("Selecciona Total o Parcial")
         .addOptions(
           new StringSelectMenuOptionBuilder().setLabel("Total").setValue("total"),
@@ -320,6 +341,41 @@ function register(client, rootConfig) {
     });
   }
 
+  async function handleAdminDetailsSubmission(interaction) {
+    const session = dateSessions.get(interaction.user.id);
+    if (!session?.type || !session.admin) {
+      return interaction.reply({ content: "La selección ha caducado. Vuelve a pulsar AÑADIR INACTIVIDAD MANUAL.", ephemeral: true });
+    }
+
+    const userId = interaction.fields.getTextInputValue("userId").trim();
+    if (!/^\d{17,20}$/.test(userId)) {
+      return interaction.reply({ content: "El ID de Discord introducido no es válido.", ephemeral: true });
+    }
+    const guild = await client.guilds.fetch(rootConfig.guildId);
+    const targetMember = await guild.members.fetch(userId).catch(() => null);
+    if (!targetMember) {
+      return interaction.reply({ content: "No encuentro a ese usuario dentro del servidor.", ephemeral: true });
+    }
+
+    const today = dateKey(new Date(), rootConfig.timezone);
+    Object.assign(session, {
+      targetUserId: targetMember.id,
+      targetDiscordName: targetMember.user.tag,
+      icName: interaction.fields.getTextInputValue("icName").trim(),
+      reason: interaction.fields.getTextInputValue("reason").trim(),
+      stage: "start",
+      minimumDate: today,
+      selectedDate: today,
+      dayPage: dateParts(today).day >= 25 ? 2 : 1
+    });
+    dateSessions.set(interaction.user.id, session);
+    await interaction.reply({
+      content: datePickerContent(session),
+      components: buildDatePicker(session),
+      ephemeral: true
+    });
+  }
+
   async function handleRequest(interaction) {
     const guild = await client.guilds.fetch(rootConfig.guildId);
     const member = await guild.members.fetch(interaction.user.id).catch(() => null);
@@ -343,11 +399,34 @@ function register(client, rootConfig) {
     await interaction.reply({ content: message, ephemeral: true });
   }
 
+  async function handleAdminRequest(interaction) {
+    const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+    if (!member?.roles.cache.has(config.viewerRoleId)) {
+      return interaction.reply({ content: "No tienes permiso para añadir inactividades manualmente.", ephemeral: true });
+    }
+    return interaction.reply({
+      content: "Selecciona el tipo de inactividad que quieres asignar:",
+      components: [buildTypePicker(ADMIN_TYPE_SELECT_ID)],
+      ephemeral: true
+    });
+  }
+
   async function handleTypeSelection(interaction) {
     const type = normalizeType(interaction.values[0]);
     if (!type) return interaction.reply({ content: "Selecciona Total o Parcial.", ephemeral: true });
     dateSessions.set(interaction.user.id, { type });
     await interaction.showModal(buildModal());
+  }
+
+  async function handleAdminTypeSelection(interaction) {
+    const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+    if (!member?.roles.cache.has(config.viewerRoleId)) {
+      return interaction.reply({ content: "No tienes permiso para añadir inactividades manualmente.", ephemeral: true });
+    }
+    const type = normalizeType(interaction.values[0]);
+    if (!type) return interaction.reply({ content: "Selecciona Total o Parcial.", ephemeral: true });
+    dateSessions.set(interaction.user.id, { type, admin: true, administeredBy: interaction.user.id });
+    await interaction.showModal(buildAdminModal());
   }
 
   async function finishDateSelection(interaction, session) {
@@ -362,7 +441,7 @@ function register(client, rootConfig) {
 
     const start = parseSpanishDate(formatKey(session.startDate));
     const end = session.indefinite ? null : parseSpanishDate(formatKey(session.selectedDate));
-    if (session.type === "total" && exceedsOneCalendarMonth(start, end)) {
+    if (!session.admin && session.type === "total" && exceedsOneCalendarMonth(start, end)) {
       const channel = await notificationChannel();
       await channel.send({
         content: `<@${interaction.user.id}> ¡Lo sentimos. supera su inactividad total más de un mes, abra ticket para hablarlo con directiva!`,
@@ -374,9 +453,10 @@ function register(client, rootConfig) {
 
     const today = dateKey(new Date(), rootConfig.timezone);
     const data = store.read();
+    const entryUserId = session.admin ? session.targetUserId : interaction.user.id;
     const entry = {
-      userId: interaction.user.id,
-      discordName: interaction.user.tag,
+      userId: entryUserId,
+      discordName: session.admin ? session.targetDiscordName : interaction.user.tag,
       icName: session.icName,
       reason: session.reason,
       type: session.type,
@@ -386,15 +466,16 @@ function register(client, rootConfig) {
       indefinite: session.indefinite === true,
       roleApplied: false,
       finished: false,
-      requestedAt: new Date().toISOString()
+      requestedAt: new Date().toISOString(),
+      administeredBy: session.admin ? session.administeredBy : null
     };
-    data.entries[interaction.user.id] = entry;
+    data.entries[entryUserId] = entry;
     if (entry.startDate <= today) await applyRole(entry);
     store.write(data);
     dateSessions.delete(interaction.user.id);
     const confirmation = entry.indefinite
-      ? `Inactividad parcial indefinida registrada desde el ${formatKey(entry.startDate)}. El rol permanecerá hasta que retires tu inactividad.`
-      : `Inactividad ${entry.type} registrada del ${formatKey(entry.startDate)} al ${formatKey(entry.endDate)}. El rol se retirará el ${formatKey(entry.cleanupDate)} a las 10:00.`;
+      ? `Inactividad parcial indefinida registrada para <@${entry.userId}> desde el ${formatKey(entry.startDate)}.`
+      : `Inactividad ${entry.type} registrada para <@${entry.userId}> del ${formatKey(entry.startDate)} al ${formatKey(entry.endDate)}. El rol se retirará el ${formatKey(entry.cleanupDate)} a las 10:00.`;
     await interaction.update({
       content: confirmation,
       components: []
@@ -495,8 +576,11 @@ function register(client, rootConfig) {
     try {
       if (interaction.isButton() && interaction.customId === REQUEST_BUTTON_ID) return handleRequest(interaction);
       if (interaction.isButton() && interaction.customId === REMOVE_BUTTON_ID) return removeInactivity(interaction);
+      if (interaction.isButton() && interaction.customId === ADMIN_REQUEST_BUTTON_ID) return handleAdminRequest(interaction);
       if (interaction.isModalSubmit() && interaction.customId === SUBMIT_MODAL_ID) return handleDetailsSubmission(interaction);
+      if (interaction.isModalSubmit() && interaction.customId === ADMIN_SUBMIT_MODAL_ID) return handleAdminDetailsSubmission(interaction);
       if (interaction.isStringSelectMenu() && interaction.customId === TYPE_SELECT_ID) return handleTypeSelection(interaction);
+      if (interaction.isStringSelectMenu() && interaction.customId === ADMIN_TYPE_SELECT_ID) return handleAdminTypeSelection(interaction);
       if (interaction.isStringSelectMenu() && [DATE_YEAR_ID, DATE_MONTH_ID, DATE_DAY_ID].includes(interaction.customId)) return handleDateComponent(interaction);
       if (interaction.isButton() && [DATE_CONFIRM_ID, DATE_INDEFINITE_ID].includes(interaction.customId)) return handleDateComponent(interaction);
       if (interaction.isChatInputCommand() && interaction.commandName === "inactividades") return listEntries(interaction);

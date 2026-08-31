@@ -59,6 +59,8 @@ Al arrancar, el bot publica una sola vez el panel **SOLICITAR INACTIVIDAD** en e
 
 El botón **ELIMINAR MI INACTIVIDAD** permite que cada usuario retire su propia solicitud, elimina el rol aplicado y publica un aviso en el canal de notificaciones.
 
+El botón **AÑADIR INACTIVIDAD MANUAL** solo puede utilizarlo el rol de consulta configurado. Permite indicar el ID de Discord del usuario, nombre IC, razón, tipo y fechas. Estas asignaciones se registran y vencen igual que las solicitudes normales, pero no tienen el límite de un mes para la inactividad total, por lo que pueden abarcar tres meses o más.
+
 - `Total`: duración máxima de un mes natural.
 - `Parcial`: aplica el rol parcial durante todo el intervalo.
 - `Parcial indefinida`: después de elegir la fecha de inicio, permite dejar la solicitud sin fecha final hasta que el usuario la retire manualmente.
