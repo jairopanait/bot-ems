@@ -280,12 +280,16 @@ function register(client, rootConfig) {
 
   async function applyRole(entry) {
     const guild = await client.guilds.fetch(rootConfig.guildId);
-    const member = await guild.members.fetch(entry.userId).catch(() => null);
-    if (!member) return;
+    let member = await guild.members.fetch({ user: entry.userId, force: true }).catch(() => null);
+    if (!member) throw new Error(`No se encontró al usuario ${entry.userId} para aplicar su rol de inactividad.`);
     const roleId = entry.type === "total" ? config.totalRoleId : config.partialRoleId;
     const otherRoleId = entry.type === "total" ? config.partialRoleId : config.totalRoleId;
     if (member.roles.cache.has(otherRoleId)) await member.roles.remove(otherRoleId);
     if (!member.roles.cache.has(roleId)) await member.roles.add(roleId, "Inactividad vigente");
+    member = await guild.members.fetch({ user: entry.userId, force: true });
+    if (!member.roles.cache.has(roleId)) {
+      throw new Error(`Discord no confirmó el rol ${roleId} para el usuario ${entry.userId}.`);
+    }
     entry.roleApplied = true;
   }
 
@@ -308,13 +312,20 @@ function register(client, rootConfig) {
     let changed = false;
     for (const entry of Object.values(data.entries)) {
       if (entry.finished) continue;
-      if (!entry.roleApplied && now.date >= entry.startDate) {
-        await applyRole(entry);
+      try {
+        if (entry.cleanupDate && (now.date > entry.cleanupDate || (now.date === entry.cleanupDate && now.hour >= 10))) {
+          await finishEntry(entry);
+          changed = true;
+          continue;
+        }
+        if (now.date >= entry.startDate) {
+          await applyRole(entry);
+          changed = true;
+        }
+      } catch (error) {
+        entry.roleApplied = false;
         changed = true;
-      }
-      if (entry.cleanupDate && (now.date > entry.cleanupDate || (now.date === entry.cleanupDate && now.hour >= 10))) {
-        await finishEntry(entry);
-        changed = true;
+        console.error(`No se pudo sincronizar la inactividad de ${entry.userId}:`, error);
       }
     }
     if (changed) store.write(data);
