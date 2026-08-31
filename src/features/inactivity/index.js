@@ -474,7 +474,7 @@ function register(client, rootConfig) {
     store.write(data);
     dateSessions.delete(interaction.user.id);
     const channel = await notificationChannel();
-    const finalDate = entry.indefinite ? "sin fecha final" : formatKey(entry.endDate);
+    const finalDate = entry.indefinite ? "indefinida" : formatKey(entry.endDate);
     await channel.send({
       content: `¡Su inactividad ${entry.type} está vigente desde ${formatKey(entry.startDate)} hasta ${finalDate} <@${entry.userId}>!`,
       allowedMentions: { users: [entry.userId] }
