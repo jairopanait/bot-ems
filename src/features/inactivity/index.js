@@ -473,6 +473,12 @@ function register(client, rootConfig) {
     if (entry.startDate <= today) await applyRole(entry);
     store.write(data);
     dateSessions.delete(interaction.user.id);
+    const channel = await notificationChannel();
+    const finalDate = entry.indefinite ? "sin fecha final" : formatKey(entry.endDate);
+    await channel.send({
+      content: `¡Su inactividad ${entry.type} está vigente desde ${formatKey(entry.startDate)} hasta ${finalDate} <@${entry.userId}>!`,
+      allowedMentions: { users: [entry.userId] }
+    });
     const confirmation = entry.indefinite
       ? `Inactividad parcial indefinida registrada para <@${entry.userId}> desde el ${formatKey(entry.startDate)}.`
       : `Inactividad ${entry.type} registrada para <@${entry.userId}> del ${formatKey(entry.startDate)} al ${formatKey(entry.endDate)}. El rol se retirará el ${formatKey(entry.cleanupDate)} a las 10:00.`;
