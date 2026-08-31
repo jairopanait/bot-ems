@@ -568,7 +568,21 @@ function register(client, rootConfig) {
     if (!member.roles.cache.has(config.viewerRoleId)) {
       return interaction.reply({ content: "No tienes permiso para consultar las inactividades.", ephemeral: true });
     }
-    const entries = Object.values(store.read().entries).filter((entry) => !entry.finished);
+    const entries = Object.values(store.read().entries)
+      .filter((entry) => !entry.finished)
+      .sort((left, right) => {
+        const group = (entry) => {
+          if (entry.type === "total") return 0;
+          if (!entry.indefinite) return 1;
+          return 2;
+        };
+        const groupDifference = group(left) - group(right);
+        if (groupDifference !== 0) return groupDifference;
+        if (left.indefinite && right.indefinite) {
+          return left.startDate.localeCompare(right.startDate) || left.icName.localeCompare(right.icName, "es");
+        }
+        return left.endDate.localeCompare(right.endDate) || left.icName.localeCompare(right.icName, "es");
+      });
     if (!entries.length) return interaction.reply({ content: "No hay inactividades vigentes.", ephemeral: true });
     const chunks = [];
     for (let index = 0; index < entries.length; index += 10) chunks.push(entries.slice(index, index + 10));

@@ -70,6 +70,8 @@ El botón **AÑADIR INACTIVIDAD MANUAL** solo puede utilizarlo el rol de consult
 - `Parcial indefinida`: después de elegir la fecha de inicio, permite dejar la solicitud sin fecha final hasta que el usuario la retire manualmente.
 - `/inactividades`: lista privada para miembros con el rol de consulta configurado.
 
+El listado muestra primero las inactividades totales ordenadas por la fecha final más próxima, después las parciales con el mismo criterio y, al final, las parciales indefinidas.
+
 Los registros se guardan en `data/inactivities.json` o en el volumen persistente indicado por `DATA_DIR`.
 
 ## Comprobaciones
