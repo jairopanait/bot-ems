@@ -81,7 +81,7 @@ function register(client, rootConfig) {
   }
 
   async function startQuestionnaire(interaction) {
-    sessions.set(interaction.user.id, { index: 0, answers: {}, startedAt: Date.now() });
+    sessions.set(interaction.user.id, { index: 0, answers: {}, startedAt: Date.now(), progressMessageCreated: false });
     await interaction.showModal(buildQuestionModal(0));
   }
 
@@ -126,19 +126,24 @@ function register(client, rootConfig) {
 
     if (session.index < questions.length) {
       const nextQuestion = questions[session.index];
-      return interaction.reply({
+      const response = {
         content: `Respuesta guardada (**${session.index}/${questions.length}**). Siguiente: **${nextQuestion.prompt}**`,
         components: [new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId(NEXT_BUTTON_ID).setLabel("SIGUIENTE PREGUNTA").setStyle(ButtonStyle.Success)
-        )],
-        ephemeral: true
-      });
+        )]
+      };
+      if (session.progressMessageCreated && interaction.isFromMessage()) {
+        return interaction.update(response);
+      }
+      session.progressMessageCreated = true;
+      return interaction.reply({ ...response, ephemeral: true });
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    if (session.progressMessageCreated && interaction.isFromMessage()) await interaction.deferUpdate();
+    else await interaction.deferReply({ ephemeral: true });
     await publishAnswers(interaction, session);
     sessions.delete(interaction.user.id);
-    await interaction.editReply("Plantilla enviada correctamente. ¡Gracias!");
+    await interaction.editReply({ content: "Plantilla enviada correctamente. ¡Gracias!", components: [] });
   }
 
   client.once(Events.ClientReady, () => {

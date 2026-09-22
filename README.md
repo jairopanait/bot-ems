@@ -56,7 +56,7 @@ Al arrancar, el bot publica o actualiza un único panel en el canal configurado 
 
 ## Cuestionario obligatorio EMS
 
-El bot publica un panel en el canal configurado. Cada usuario responde de forma privada las siete preguntas, una por una. Al completar la última, la plantilla íntegra se publica en el canal de resultados junto con su mención, nombre de Discord e ID.
+El bot publica un panel en el canal configurado. Cada usuario responde de forma privada las siete preguntas, una por una. El mismo mensaje privado se actualiza entre preguntas para evitar crear mensajes repetidos. Al completar la última, la plantilla íntegra se publica en el canal de resultados junto con su mención, nombre de Discord e ID.
 
 ## Inactividades
 
