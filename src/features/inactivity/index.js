@@ -292,13 +292,23 @@ function register(client, rootConfig) {
     return `**${step}**\nFecha seleccionada: **${formatKey(session.selectedDate)}**`;
   }
 
+  function activeEntriesForUser(data, userId) {
+    return Object.entries(data.entries)
+      .filter(([, entry]) => entry.userId === userId && !entry.finished);
+  }
+
+  function saveEntry(data, entry) {
+    for (const [key, existing] of Object.entries(data.entries)) {
+      if (existing.userId === entry.userId && existing.type === entry.type) delete data.entries[key];
+    }
+    data.entries[`${entry.userId}:${entry.type}`] = entry;
+  }
+
   async function applyRole(entry) {
     const guild = await client.guilds.fetch(rootConfig.guildId);
     let member = await guild.members.fetch({ user: entry.userId, force: true }).catch(() => null);
     if (!member) throw new Error(`No se encontró al usuario ${entry.userId} para aplicar su rol de inactividad.`);
     const roleId = entry.type === "total" ? config.totalRoleId : config.partialRoleId;
-    const otherRoleId = entry.type === "total" ? config.partialRoleId : config.totalRoleId;
-    if (member.roles.cache.has(otherRoleId)) await member.roles.remove(otherRoleId);
     if (!member.roles.cache.has(roleId)) await member.roles.add(roleId, "Inactividad vigente");
     member = await guild.members.fetch({ user: entry.userId, force: true });
     if (!member.roles.cache.has(roleId)) {
@@ -455,25 +465,28 @@ function register(client, rootConfig) {
       return interaction.reply({ content: "El ID de Discord introducido no es válido.", ephemeral: true });
     }
     const data = store.read();
-    const entry = data.entries[userId];
-    if (!entry || entry.finished) {
+    const activeEntries = activeEntriesForUser(data, userId);
+    if (!activeEntries.length) {
       return interaction.reply({ content: "Ese usuario no tiene ninguna inactividad vigente.", ephemeral: true });
     }
     await interaction.deferReply({ ephemeral: true });
 
     const guild = await client.guilds.fetch(rootConfig.guildId);
     const member = await guild.members.fetch({ user: userId, force: true }).catch(() => null);
-    const roleId = entry.type === "total" ? config.totalRoleId : config.partialRoleId;
-    if (member?.roles.cache.has(roleId)) {
-      await member.roles.remove(roleId, `Inactividad eliminada manualmente por ${interaction.user.tag}`);
+    const removedTypes = [...new Set(activeEntries.map(([, entry]) => entry.type))];
+    for (const type of removedTypes) {
+      const roleId = type === "total" ? config.totalRoleId : config.partialRoleId;
+      if (member?.roles.cache.has(roleId)) {
+        await member.roles.remove(roleId, `Inactividad eliminada manualmente por ${interaction.user.tag}`);
+      }
     }
 
-    delete data.entries[userId];
+    for (const [key] of activeEntries) delete data.entries[key];
     store.write(data);
 
     const channel = await notificationChannel();
     await channel.send({
-      content: `<@${userId}> ¡Su inactividad ${entry.type} finalizó! Para renovarla vuelva a solicitarla en el canal correspondiente.`,
+      content: `<@${userId}> ¡Su inactividad ${removedTypes.join(" y ")} finalizó! Para renovarla vuelva a solicitarla en el canal correspondiente.`,
       allowedMentions: { users: [userId] }
     });
     await interaction.editReply({ content: `La inactividad de <@${userId}> se ha eliminado correctamente.`, allowedMentions: { parse: [] } });
@@ -537,7 +550,7 @@ function register(client, rootConfig) {
       requestedAt: new Date().toISOString(),
       administeredBy: session.admin ? session.administeredBy : null
     };
-    data.entries[entryUserId] = entry;
+    saveEntry(data, entry);
     if (entry.startDate <= today) await applyRole(entry);
     store.write(data);
     dateSessions.delete(interaction.user.id);
@@ -597,19 +610,19 @@ function register(client, rootConfig) {
 
   async function removeInactivity(interaction) {
     const data = store.read();
-    const entry = data.entries[interaction.user.id];
-    if (!entry || entry.finished) {
+    const activeEntries = activeEntriesForUser(data, interaction.user.id);
+    if (!activeEntries.length) {
       return interaction.reply({ content: "No tienes ninguna inactividad vigente para retirar.", ephemeral: true });
     }
 
     const guild = await client.guilds.fetch(rootConfig.guildId);
     const member = await guild.members.fetch(interaction.user.id).catch(() => null);
-    const roleId = entry.type === "total" ? config.totalRoleId : config.partialRoleId;
-    if (member?.roles.cache.has(roleId)) await member.roles.remove(roleId, "Inactividad retirada por el usuario");
-
-    entry.finished = true;
-    entry.cancelled = true;
-    entry.cancelledAt = new Date().toISOString();
+    const activeTypes = [...new Set(activeEntries.map(([, entry]) => entry.type))];
+    for (const type of activeTypes) {
+      const roleId = type === "total" ? config.totalRoleId : config.partialRoleId;
+      if (member?.roles.cache.has(roleId)) await member.roles.remove(roleId, "Inactividad retirada por el usuario");
+    }
+    for (const [key] of activeEntries) delete data.entries[key];
     store.write(data);
 
     const channel = await notificationChannel();

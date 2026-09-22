@@ -79,6 +79,8 @@ El botón **ELIMINAR INACTIVIDAD DE USUARIO** está restringido al mismo rol adm
 
 El listado muestra primero las inactividades totales ordenadas por la fecha final más próxima, después las parciales con el mismo criterio y, al final, las parciales indefinidas.
 
+Cada usuario puede mantener simultáneamente una inactividad total y otra parcial. Ambas se guardan como registros independientes, aparecen en el resumen y conservan sus respectivos roles hasta que finalicen o se retiren.
+
 Los registros se guardan en `data/inactivities.json` o en el volumen persistente indicado por `DATA_DIR`.
 
 ## Comprobaciones
