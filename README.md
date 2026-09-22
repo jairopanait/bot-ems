@@ -7,6 +7,7 @@ Un único bot de Discord que reúne los tres proyectos originales:
 - Salidas de facción: procesa usuarios mencionados, ajusta roles/apodo y publica la plantilla.
 - Inactividades: panel interactivo, roles automáticos, vencimientos y consulta de solicitudes vigentes.
 - H-50: panel de entrada y salida para asignar o retirar automáticamente el rol H-50.
+- Cuestionario EMS: formulario obligatorio por pasos y publicación de la plantilla completa.
 
 ## Puesta en marcha
 
@@ -52,6 +53,10 @@ BOT EMS necesita ver canales, enviar mensajes, añadir reacciones, leer historia
 ## H-50
 
 Al arrancar, el bot publica o actualiza un único panel en el canal configurado con los botones **Entrada H-50** y **Salida H-50**. El primero asigna el rol H-50 y el segundo lo retira. La interacción no publica respuestas ni mueve al usuario a canales de voz.
+
+## Cuestionario obligatorio EMS
+
+El bot publica un panel en el canal configurado. Cada usuario responde de forma privada las siete preguntas, una por una. Al completar la última, la plantilla íntegra se publica en el canal de resultados junto con su mención, nombre de Discord e ID.
 
 ## Inactividades
 

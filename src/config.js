@@ -54,5 +54,9 @@ module.exports = Object.freeze({
   h50: {
     panelChannelId: value("H50_PANEL_CHANNEL_ID", "1543639274103119893"),
     roleId: value("H50_ROLE_ID", "1543639741751103609")
+  },
+  emsQuestionnaire: {
+    panelChannelId: value("EMS_QUESTIONNAIRE_PANEL_CHANNEL_ID", "1493747550254272672"),
+    outputChannelId: value("EMS_QUESTIONNAIRE_OUTPUT_CHANNEL_ID", "1129103806869798922")
   }
 });

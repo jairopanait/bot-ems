@@ -6,6 +6,7 @@ const postulations = require("./features/postulations");
 const faction = require("./features/faction");
 const inactivity = require("./features/inactivity");
 const h50 = require("./features/h50");
+const emsQuestionnaire = require("./features/ems-questionnaire");
 
 const client = new Client({
   intents: [
@@ -16,7 +17,7 @@ const client = new Client({
   ]
 });
 
-const features = [birthdays, postulations, faction, inactivity, h50];
+const features = [birthdays, postulations, faction, inactivity, h50, emsQuestionnaire];
 for (const feature of features) feature.register(client, config);
 
 client.once(Events.ClientReady, async (readyClient) => {
