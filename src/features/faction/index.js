@@ -185,6 +185,7 @@ function register(client, rootConfig) {
 
   client.on(Events.MessageCreate, async (message) => {
     if (!message.inGuild() || message.guildId !== config.guildId || message.channelId !== config.triggerChannelId) return;
+    if (message.content.trim().toLowerCase().startsWith("!renuncia")) return;
     const userIds = [...message.mentions.users.values()].filter((user) => user.id !== client.user.id).map((user) => user.id);
     if (!userIds.length) return;
     const control = await message.reply({ content: "Selecciona qué gestión deseas realizar:", components: [actionRow(message.id)] });

@@ -8,6 +8,7 @@ Un único bot de Discord que reúne los tres proyectos originales:
 - Inactividades: panel interactivo, roles automáticos, vencimientos y consulta de solicitudes vigentes.
 - H-50: panel de entrada y salida para asignar o retirar automáticamente el rol H-50.
 - Cuestionario EMS: formulario obligatorio por pasos y publicación de la plantilla completa.
+- Renuncias: comando `!renuncia @usuario` con motivo y blacklist guiados.
 
 ## Puesta en marcha
 
@@ -57,6 +58,10 @@ Al arrancar, el bot publica o actualiza un único panel en el canal configurado 
 ## Cuestionario obligatorio EMS
 
 El bot publica un panel en el canal configurado. Cada usuario responde de forma privada las siete preguntas, una por una. El mismo mensaje privado se actualiza entre preguntas para evitar crear mensajes repetidos. Al completar la última, la plantilla íntegra se publica en el canal de resultados junto con su mención, nombre de Discord e ID.
+
+## Renuncias
+
+Los miembros con uno de los roles autorizados pueden usar `!renuncia @usuario`. El bot solicita de forma privada el motivo y si tiene blacklist. Después elimina el apodo, deja únicamente los roles preservados, añade el rol de salida y publica la plantilla en el canal de salidas y en el canal donde se ejecutó el comando.
 
 ## Inactividades
 
