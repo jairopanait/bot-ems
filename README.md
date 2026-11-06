@@ -4,7 +4,7 @@ Un único bot de Discord que reúne los tres proyectos originales:
 
 - Cumpleaños: registro por mensaje y `/cumple`, consulta, borrado y felicitación automática.
 - Postulaciones EMS: admisión escrita, instrucción aprobada o suspensa, anuncios y gestión de roles.
-- Salidas de facción: ante un mensaje con menciones permite elegir descenso o expulsión; las expulsiones pueden ser por horas o por conducta, con blacklist configurable.
+- Salidas de facción: ante un mensaje con menciones permite elegir descenso o expulsión; las expulsiones pueden ser por horas o por conducta, con blacklist configurable. Las expulsiones por conducta añaden su rol específico y una blacklist añade el suyo.
 - Inactividades: panel interactivo, roles automáticos, vencimientos y consulta de solicitudes vigentes.
 - H-50: panel de entrada y salida para asignar o retirar automáticamente el rol H-50.
 - Cuestionario EMS: formulario obligatorio por pasos y publicación de la plantilla completa.

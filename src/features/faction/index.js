@@ -12,6 +12,8 @@ const ACTION_SELECT_PREFIX = "faction:action:";
 const REASON_SELECT_PREFIX = "faction:reason:";
 const BLACKLIST_SELECT_PREFIX = "faction:blacklist:";
 const REASON_MODAL_PREFIX = "faction:reason-modal:";
+const BLACKLIST_ROLE_ID = "1129583588766122006";
+const MISCONDUCT_EXPULSION_ROLE_ID = "1343636194390573186";
 
 function register(client, rootConfig) {
   const config = rootConfig.faction;
@@ -63,11 +65,11 @@ function register(client, rootConfig) {
     );
   }
 
-  async function processMember(message, member, reason, blacklisted) {
+  async function processMember(message, member, reason, blacklisted, additionalRoleIds) {
     const me = message.guild.members.me ?? await message.guild.members.fetchMe();
     const required = [PermissionFlagsBits.ManageRoles, PermissionFlagsBits.ManageNicknames, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages];
     if (!me.permissions.has(required)) throw new Error("Al bot le faltan permisos para gestionar roles, apodos o mensajes.");
-    await member.roles.set([...config.preservedRoleIds, ...config.rolesToAdd], `Salida solicitada en ${message.id}`);
+    await member.roles.set([...new Set([...config.preservedRoleIds, ...config.rolesToAdd, ...additionalRoleIds])], `Salida solicitada en ${message.id}`);
     await member.setNickname(null, `Salida solicitada en ${message.id}`);
     const channel = await message.guild.channels.fetch(config.outputChannelId);
     if (!channel?.isTextBased()) throw new Error("El canal de salida no existe o no permite mensajes.");
@@ -76,9 +78,12 @@ function register(client, rootConfig) {
 
   async function completeExpulsion(session) {
     let failures = 0;
+    const additionalRoleIds = [];
+    if (session.isMisconduct) additionalRoleIds.push(MISCONDUCT_EXPULSION_ROLE_ID);
+    if (session.blacklisted === "sí") additionalRoleIds.push(BLACKLIST_ROLE_ID);
     for (const userId of session.userIds) {
       try {
-        await processMember(session.sourceMessage, await session.sourceMessage.guild.members.fetch(userId), session.reason, session.blacklisted);
+        await processMember(session.sourceMessage, await session.sourceMessage.guild.members.fetch(userId), session.reason, session.blacklisted, additionalRoleIds);
       } catch (error) {
         failures += 1;
         console.error(`No se pudo procesar la salida de ${userId}:`, error);
@@ -121,6 +126,7 @@ function register(client, rootConfig) {
     if (interaction.values[0] === "hours") {
       session.reason = "Expulsión horas";
       session.blacklisted = "no";
+      session.isMisconduct = false;
       await interaction.deferUpdate();
       const failures = await completeExpulsion(session);
       sessions.delete(messageId);
@@ -152,6 +158,7 @@ function register(client, rootConfig) {
     if (unauthorized) return interaction.reply({ content: "No tienes permiso para completar esta gestión.", ephemeral: true });
     if (!session) return interaction.reply({ content: "Esta gestión ha caducado. Envía de nuevo el mensaje con la mención.", ephemeral: true });
     session.reason = interaction.fields.getTextInputValue("reason").trim();
+    session.isMisconduct = true;
     await interaction.reply({
       content: "Selecciona si la persona tiene blacklist:",
       components: [blacklistRow(messageId)],
