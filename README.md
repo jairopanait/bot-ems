@@ -61,7 +61,7 @@ El bot publica un panel en el canal configurado. Cada usuario responde de forma 
 
 ## Renuncias
 
-Los miembros con uno de los roles autorizados pueden usar `!renuncia @usuario`. El bot solicita de forma privada el motivo y si tiene blacklist. Después elimina el apodo, deja únicamente los roles preservados, añade el rol de salida y publica la plantilla en el canal de salidas y en el canal donde se ejecutó el comando.
+Los miembros con uno de los roles autorizados pueden usar `!renuncia @usuario`. El bot solicita de forma privada el motivo y si tiene blacklist. Después elimina el apodo, conserva únicamente los roles de la lista que el usuario ya tuviera, añade el rol de salida y publica la plantilla en el canal de salidas y en el canal donde se ejecutó el comando.
 
 ## Inactividades
 

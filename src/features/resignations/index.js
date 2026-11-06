@@ -59,7 +59,8 @@ function register(client, rootConfig) {
     const required = [PermissionFlagsBits.ManageRoles, PermissionFlagsBits.ManageNicknames, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages];
     if (!me.permissions.has(required)) throw new Error("Al bot le faltan permisos para gestionar roles, apodos o mensajes.");
     const member = await guild.members.fetch(session.targetUserId);
-    const roles = [...new Set([...config.preservedRoleIds, config.exitRoleId])];
+    const retainedRoleIds = config.preservedRoleIds.filter((roleId) => member.roles.cache.has(roleId));
+    const roles = [...new Set([...retainedRoleIds, config.exitRoleId])];
     await member.roles.set(roles, `Renuncia gestionada por ${session.executorTag}`);
     await member.setNickname(null, `Renuncia gestionada por ${session.executorTag}`);
     await publishTemplate(session, member);
