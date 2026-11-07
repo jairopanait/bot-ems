@@ -1,12 +1,7 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, Events, SlashCommandBuilder, StringSelectMenuBuilder } = require("discord.js");
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, Events, StringSelectMenuBuilder } = require("discord.js");
 const { createJsonStore } = require("../../storage");
 
-const commands = [
-  new SlashCommandBuilder().setName("instruccionaprobada").setDescription("Aprueba la instrucción de un usuario.")
-    .addUserOption((option) => option.setName("usuario").setDescription("Usuario aprobado.").setRequired(true)),
-  new SlashCommandBuilder().setName("instruccionsuspensa").setDescription("Suspende la instrucción de un usuario.")
-    .addUserOption((option) => option.setName("usuario").setDescription("Usuario suspenso.").setRequired(true))
-];
+const commands = [];
 
 const HEART = "<:corazon:1325652660556267580>";
 const EMS = "<:_ems_:1325652657804677232>";
@@ -82,14 +77,12 @@ function register(client, rootConfig) {
       await announce(`${HEART} **¡Felicidades ${member} por aprobar su instrucción!**\n\n${EMS} **Bienvenido al cuerpo de EMS.**`);
       return interaction.editReply(`${HEART} **Instrucción aprobada** para ${member}.`);
     }
-    await requireAnyRole(interaction, config.oralCommandRoleIds);
-    await announce(`${EMS} **¡Lo sentimos, ${member}, no consiguió aprobar esta instrucción!**\n\n${HEART} **En la siguiente será. ¡ÁNIMO!**`);
-    return interaction.editReply(`${HEART} **Instrucción suspensa** para ${member}. No se ha añadido ningún rol.`);
+
   }
 
   client.on(Events.MessageCreate, async (message) => {
     if (!message.inGuild() || message.author.bot) return;
-    const match = message.content.trim().match(/^!(aceptar|rechazar)\s+<@!?(\d{17,20})>\s*$/i);
+    const match = message.content.trim().match(/^!(aceptar|rechazar|instruccion)\s+<@!?(\d{17,20})>\s*$/i);
     if (!match) return;
     let response;
     let reason;
@@ -97,7 +90,7 @@ function register(client, rootConfig) {
     const context = {
       guild: message.guild,
       user: message.author,
-      commandName: match[1].toLowerCase() === "aceptar" ? "aceptarescrita" : "rechazarpostulacion",
+      commandName: { aceptar: "aceptarescrita", rechazar: "rechazarpostulacion", instruccion: "instruccionaprobada" }[match[1].toLowerCase()],
       options: { getUser: () => ({ id: match[2] }), getString: () => reason },
       deferReply: async () => {},
       // Prefix commands leave only the final announcement in the server.
@@ -111,7 +104,7 @@ function register(client, rootConfig) {
     try {
       // Fail before changing roles if the command cannot be removed.
       await message.delete();
-      await requireAnyRole(context, config.writtenCommandRoleIds);
+      await requireAnyRole(context, context.commandName === "instruccionaprobada" ? config.oralCommandRoleIds : config.writtenCommandRoleIds);
       await target(context);
       if (context.commandName === "rechazarpostulacion") {
         response = await message.channel.send({
@@ -179,15 +172,6 @@ function register(client, rootConfig) {
     }
   });
 
-  client.on(Events.InteractionCreate, async (interaction) => {
-    if (!interaction.isChatInputCommand() || !commands.some((command) => command.name === interaction.commandName)) return;
-    try { await handle(interaction); } catch (error) {
-      console.error("Error en postulaciones:", error);
-      const content = error instanceof UserFacingError ? error.message : `${EMS} **Ha fallado el comando. Revisa permisos y jerarquía de roles.**`;
-      if (interaction.deferred || interaction.replied) await interaction.editReply(content).catch(() => {});
-      else await interaction.reply({ content, ephemeral: true }).catch(() => {});
-    }
-  });
 }
 
 module.exports = { name: "postulaciones", commands, register };
