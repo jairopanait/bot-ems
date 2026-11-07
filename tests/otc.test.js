@@ -99,6 +99,7 @@ test("First private form links account; later buttons clock directly with no pas
   const client = { once: () => {}, on: (e, fn) => { handlers[e] = fn; }, channels: { fetch: async () => ({ guildId: "guild", isTextBased: () => true, send: async (p) => logs.push(p) }) } };
   const otc = {
     authenticate: async ({ password }) => { assert.equal(password, "private-fixture"); return { credential }; },
+    getCurrentShift: async () => ({ state: { sInDateTime: "2020-01-01T00:00:00Z" } }),
     clock: async (args) => { if (!valid) throw new OtcAuthError("Contraseña cambiada"); calls.push(args); return { action: args.action, confirmedAt: new Date() }; }
   };
   feature.register(client, config, { now: () => time, otc });
