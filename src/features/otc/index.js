@@ -84,8 +84,12 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
       .setTitle("Solicitar resta de horas")
       .addComponents(
         new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId("time").setLabel("Tiempo a restar")
-            .setPlaceholder("Ejemplo: 30 minutos o 1 hora").setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80)
+          new TextInputBuilder().setCustomId("hours").setLabel("Horas a restar")
+            .setPlaceholder("Ejemplo: 1").setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(3)
+        ),
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder().setCustomId("minutes").setLabel("Minutos a restar")
+            .setPlaceholder("Ejemplo: 30").setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(2)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder().setCustomId("reason").setLabel("Razón")
@@ -106,8 +110,9 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
     const nameIc = user.FullName || [user.FirstName, user.LastName].filter(Boolean).join(" ") || user.Name || user.UserName || interaction.user.username;
     const output = await client.channels.fetch(HOURS_DEDUCTION_CHANNEL_ID).catch(() => null);
     if (!output?.isTextBased() || output.guildId !== config.guildId) throw new OtcError("No se encontró el canal de solicitudes de resta de horas.");
-    const time = interaction.fields.getTextInputValue("time").trim();
-    const reason = interaction.fields.getTextInputValue("reason").trim();
+    const hours = interaction.fields.getTextInputValue("hours").trim();
+    const minutes = interaction.fields.getTextInputValue("minutes").trim();
+    if (!/^\d{1,3}$/.test(hours) || !/^\d{1,2}$/.test(minutes) || Number(minutes) > 59 || (Number(hours) === 0 && Number(minutes) === 0)) {\n      throw new OtcError("Indica horas y minutos válidos. Los minutos deben estar entre 0 y 59.");\n    }\n    const time = `${Number(hours)} hora(s) y ${Number(minutes)} minuto(s)`;\n    const reason = interaction.fields.getTextInputValue("reason").trim();
     const embed = new EmbedBuilder()
       .setColor(0xe67e22)
       .setTitle("⏳ Solicitud de resta de horas")
