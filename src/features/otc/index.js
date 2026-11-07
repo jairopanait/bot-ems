@@ -92,8 +92,9 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
       const task = record.pending
         ? closeForNoActivity(userId, record.startedAt)
         : requestActivityCheck(userId);
-      task.catch(() => {
+      task.catch((error) => {
         // OTC can occasionally be unavailable; keep the pending verification and retry.
+        console.warn("Verificación OTC: se reintentará una comprobación.", error instanceof Error ? error.message : "Error desconocido");
         if (activityData().active[userId]) scheduleActivityCheck(userId, ACTIVITY_RETRY_MS);
       });
     }, Math.max(0, delay)));
@@ -153,6 +154,7 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
     saveActivity(data.active);
     activitySessions.set(token, { userId, startedAt: record.startedAt, expiresAt });
     scheduleActivityCheck(userId, ACTIVITY_GRACE_MS);
+    console.log("Verificación OTC: aviso de actividad enviado.");
   }
 
   async function confirmActivityCheck(interaction) {
@@ -186,6 +188,7 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
     // Check a few saved OTC accounts at a time and notify each active user immediately.
     const storedUserIds = typeof credentials.listUserIds === "function" ? credentials.listUserIds() : [];
     const candidates = storedUserIds.filter((userId) => !data.active[userId]);
+    console.log(`Verificación OTC: ${storedUserIds.length} cuentas guardadas; ${candidates.length} por revisar.`);
     let cursor = 0;
     async function recoverNext() {
       while (cursor < candidates.length) {
@@ -196,8 +199,10 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
           data.active[userId] = { startedAt: shift.state.sInDateTime, nextCheckAt: now(), pending: false };
           saveActivity(data.active);
           scheduleActivityCheck(userId, 0);
-        } catch {
+          console.log("Verificación OTC: fichaje activo detectado.");
+        } catch (error) {
           // A single unavailable or invalid OTC account must not block the other checks.
+          console.warn("Verificación OTC: no se pudo consultar una cuenta guardada.", error instanceof Error ? error.message : "Error desconocido");
         }
       }
     }
