@@ -1,7 +1,9 @@
 const { EmbedBuilder, Events } = require("discord.js");
 const { createJsonStore } = require("../../storage");
 
-const CHANNEL_ID = "1568629823960653944";
+const OTC_GUIDE_CHANNEL_ID = "1207043891988144208";
+const DISTRIBUTION_GUIDE_CHANNEL_ID = "1568629823960653944";
+const OLD_OTC_GUIDE_MESSAGE_ID = "1568637893893955668";
 
 function register(client, config) {
   const store = createJsonStore(config.dataDir, "operations-guide-panels.json", { otcMessageId: null, distributionMessageId: null });
@@ -17,12 +19,14 @@ function register(client, config) {
   }
 
   async function publish() {
-    const channel = await client.channels.fetch(CHANNEL_ID).catch(() => null);
-    if (!channel?.isTextBased() || channel.guildId !== config.guildId) throw new Error("Canal de guía operativa no válido.");
+    const otcChannel = await client.channels.fetch(OTC_GUIDE_CHANNEL_ID).catch(() => null);
+    const distributionChannel = await client.channels.fetch(DISTRIBUTION_GUIDE_CHANNEL_ID).catch(() => null);
+    if (!otcChannel?.isTextBased() || otcChannel.guildId !== config.guildId || !distributionChannel?.isTextBased() || distributionChannel.guildId !== config.guildId) throw new Error("Canal de guía operativa no válido.");
     const otcEmbed = new EmbedBuilder()
       .setColor(0x7b1113)
       .setTitle("🕒 Fichaje OTC")
       .setDescription("Puedes fichar directamente desde Discord: **no es necesario abrir OpenTimeClock en la web**.")
+      .addFields({ name: "📍 Entrar al fichaje", value: `Desde este canal entra a <#1568448649833480360> y usa los botones del panel OTC.` })
       .addFields(
         { name: "1️⃣ Primera vez", value: "En el panel OTC pulsa **ENTRADA** o **SALIDA** e introduce tu contraseña de OTC en el formulario privado. **Solo se pide una vez.** Tu usuario de OTC es tu ID de Discord." },
         { name: "2️⃣ Fichajes posteriores", value: "Después de validar la primera vez, la contraseña queda guardada de forma protegida y **solo tendrás que usar los botones ENTRADA o SALIDA**." },
@@ -45,9 +49,11 @@ function register(client, config) {
       )
       .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊" })
       .setTimestamp();
+    const oldChannel = await client.channels.fetch(DISTRIBUTION_GUIDE_CHANNEL_ID).catch(() => null);
+    await oldChannel?.messages.fetch(OLD_OTC_GUIDE_MESSAGE_ID).then((message) => message.delete()).catch(() => {});
     const saved = store.read();
-    const otcMessageId = await upsert(channel, saved.otcMessageId, otcEmbed);
-    const distributionMessageId = await upsert(channel, saved.distributionMessageId, distributionEmbed);
+    const otcMessageId = await upsert(otcChannel, saved.otcMessageId, otcEmbed);
+    const distributionMessageId = await upsert(distributionChannel, saved.distributionMessageId, distributionEmbed);
     store.write({ otcMessageId, distributionMessageId });
   }
 
