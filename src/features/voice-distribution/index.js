@@ -27,8 +27,9 @@ function register(client, config) {
     await guild.members.fetch().catch(() => {});
     const h50Members = [...guild.members.cache.values()].filter((member) => !member.user.bot && member.roles.cache.has(H50_ROLE_ID));
     const voiceLines = LINES.map(({ label, channelId }) => {
-      const channel = guild.channels.cache.get(channelId);
-      const members = channel?.isVoiceBased() ? [...channel.members.values()].filter((member) => !member.user.bot) : [];
+      const members = [...guild.voiceStates.cache.values()]
+        .filter((state) => state.channelId === channelId && state.member && !state.member.user.bot)
+        .map((state) => state.member);
       return { label, members };
     });
     const lines = [
