@@ -12,6 +12,7 @@ const commandLogs = require("./features/command-logs");
 const otc = require("./features/otc");
 const rankRequest = require("./features/rank-request");
 const voiceDistribution = require("./features/voice-distribution");
+const noticeRoles = require("./features/notice-roles");
 
 const client = new Client({
   intents: [
@@ -23,7 +24,7 @@ const client = new Client({
   ]
 });
 
-const features = [birthdays, postulations, faction, inactivity, h50, emsQuestionnaire, resignations, commandLogs, otc, rankRequest, voiceDistribution];
+const features = [birthdays, postulations, faction, inactivity, h50, emsQuestionnaire, resignations, commandLogs, otc, rankRequest, voiceDistribution, noticeRoles];
 for (const feature of features) feature.register(client, config);
 
 client.once(Events.ClientReady, async (readyClient) => {
