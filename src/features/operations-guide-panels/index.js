@@ -24,8 +24,8 @@ function register(client, config) {
       .setTitle("🕒 Fichaje OTC")
       .setDescription("Puedes fichar directamente desde Discord: **no es necesario abrir OpenTimeClock en la web**.")
       .addFields(
-        { name: "1️⃣ Primera vez", value: "En el panel OTC pulsa **ENTRADA** o **SALIDA** e introduce tu contraseña de OTC en el formulario privado. Tu usuario de OTC es tu ID de Discord." },
-        { name: "2️⃣ Fichajes posteriores", value: "Después de validar la primera vez, usa los botones **ENTRADA** o **SALIDA** con un clic. El acceso queda protegido para no tener que abrir la web." },
+        { name: "1️⃣ Primera vez", value: "En el panel OTC pulsa **ENTRADA** o **SALIDA** e introduce tu contraseña de OTC en el formulario privado. **Solo se pide una vez.** Tu usuario de OTC es tu ID de Discord." },
+        { name: "2️⃣ Fichajes posteriores", value: "Después de validar la primera vez, la contraseña queda guardada de forma protegida y **solo tendrás que usar los botones ENTRADA o SALIDA**." },
         { name: "⚠️ Salida corta", value: "Si llevas menos de 30 minutos de servicio, el bot pide confirmación antes de finalizar." },
         { name: "📸 Comprobante", value: "Al salir se muestra un resumen privado con Nombre IC, entrada, salida y duración para hacer captura." },
         { name: "⏳ Restar horas", value: "El botón **RESTAR HORAS** abre una solicitud con horas, minutos y razón para su revisión." }
