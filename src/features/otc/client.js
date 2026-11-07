@@ -88,7 +88,7 @@ function createOtcClient({ fetchImpl = globalThis.fetch } = {}) {
     });
     // Never retry writes, or interpret an arbitrary successful HTTP response as a punch.
     if (result !== "SUCCESS") throw new OtcError("OTC no ha confirmado el fichaje. Revisa tu estado en su web antes de volver a intentarlo.");
-    return { action, confirmedAt: new Date(), employeeName: user.FullName || user.Name || user.UserName || discordId, startedAt: state.sInDateTime, timeZone };
+    return { action, confirmedAt: new Date(), employeeName: user.FullName || [user.FirstName, user.LastName].filter(Boolean).join(" ") || user.Name || user.UserName || discordId, startedAt: state.sInDateTime, timeZone };
   }
   return { clock, authenticate };
 }
