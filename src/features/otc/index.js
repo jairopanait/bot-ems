@@ -169,14 +169,26 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
     await interaction.update({ content: `✅ <@${interaction.user.id}> ha confirmado que sigue de servicio.`, components: [], allowedMentions: { users: [interaction.user.id] } });
   }
 
-  function resumeActivityChecks() {
+  async function resumeActivityChecks() {
     const data = activityData();
-    for (const [userId, record] of Object.entries(data.active)) {
-      record.pending = false;
-      record.nextCheckAt = now() + Math.max(0, Number(record.nextCheckAt || 0) - now());
-      scheduleActivityCheck(userId, Math.max(0, record.nextCheckAt - now()));
+    for (const record of Object.values(data.active)) record.pending = false;
+    // An active shift may have been started before a Railway restart or deploy.
+    // Recover it from OTC so it receives the next hourly verification as well.
+    for (const userId of credentials.listUserIds()) {
+      if (data.active[userId]) continue;
+      try {
+        const shift = await otc.getCurrentShift({ discordId: userId, credential: credentials.get(userId) });
+        if (shift.state.toio === "out") {
+          data.active[userId] = { startedAt: shift.state.sInDateTime, nextCheckAt: now() + ACTIVITY_INTERVAL_MS, pending: false };
+        }
+      } catch {
+        // A single unavailable or invalid OTC account must not block the other checks.
+      }
     }
     saveActivity(data.active);
+    for (const [userId, record] of Object.entries(data.active)) {
+      scheduleActivityCheck(userId, Math.max(0, Number(record.nextCheckAt || now()) - now()));
+    }
   }
 
   async function publishPanel() {
@@ -203,7 +215,7 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
 
   client.once(Events.ClientReady, () => {
     publishPanel().catch(() => console.error("No se pudo publicar el panel de fichaje OTC."));
-    resumeActivityChecks();
+    resumeActivityChecks().catch(() => console.error("No se pudieron recuperar los fichajes OTC activos."));
   });
   async function openHoursDeductionForm(interaction) {
     for (const [key, session] of sessions) if (now() >= session.expiresAt) sessions.delete(key);
