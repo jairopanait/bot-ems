@@ -151,6 +151,8 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
     });
     record.pending = true;
     record.nextCheckAt = expiresAt;
+    record.activityToken = token;
+    record.activityExpiresAt = expiresAt;
     saveActivity(data.active);
     activitySessions.set(token, { userId, startedAt: record.startedAt, expiresAt });
     scheduleActivityCheck(userId, ACTIVITY_GRACE_MS);
@@ -159,17 +161,24 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
 
   async function confirmActivityCheck(interaction) {
     const token = interaction.customId.slice(ACTIVITY_CHECK_PREFIX.length);
-    const session = activitySessions.get(token);
-    if (!session || session.userId !== interaction.user.id || now() >= session.expiresAt) {
-      return interaction.reply({ content: "Esta comprobación ha caducado.", ephemeral: true });
-    }
     const data = activityData();
+    const persisted = Object.entries(data.active).find(([, record]) => record.activityToken === token);
+    const persistedUserId = persisted?.[0];
+    const persistedRecord = persisted?.[1];
+    const session = activitySessions.get(token)
+      || (persistedRecord ? { userId: persistedUserId, startedAt: persistedRecord.startedAt, expiresAt: persistedRecord.activityExpiresAt } : null);
+
+    if (!session || session.userId !== interaction.user.id || now() >= session.expiresAt) {
+      return interaction.update({ content: "⏱️ Esta comprobación ha caducado.", components: [], allowedMentions: { parse: [] } });
+    }
     const record = data.active[interaction.user.id];
-    if (!record || record.startedAt !== session.startedAt || !record.pending) {
-      return interaction.reply({ content: "Ya no tienes una comprobación de servicio pendiente.", ephemeral: true });
+    if (!record || record.startedAt !== session.startedAt || !record.pending || record.activityToken !== token) {
+      return interaction.update({ content: "⏱️ Ya no tienes una comprobación de servicio pendiente.", components: [], allowedMentions: { parse: [] } });
     }
     activitySessions.delete(token);
     record.pending = false;
+    delete record.activityToken;
+    delete record.activityExpiresAt;
     record.nextCheckAt = now() + ACTIVITY_INTERVAL_MS;
     saveActivity(data.active);
     scheduleActivityCheck(interaction.user.id, ACTIVITY_INTERVAL_MS);
