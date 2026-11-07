@@ -174,7 +174,8 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
     for (const record of Object.values(data.active)) record.pending = false;
     // An active shift may have been started before a Railway restart or deploy.
     // Recover it from OTC so it receives the next hourly verification as well.
-    for (const userId of credentials.listUserIds()) {
+    const storedUserIds = typeof credentials.listUserIds === "function" ? credentials.listUserIds() : [];
+    for (const userId of storedUserIds) {
       if (data.active[userId]) continue;
       try {
         const shift = await otc.getCurrentShift({ discordId: userId, credential: credentials.get(userId) });
