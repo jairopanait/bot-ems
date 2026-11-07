@@ -170,21 +170,26 @@ function register(client, rootConfig) {
         privatePanel = null;
       }
       if (context.commandName === "instruccionaprobada") {
-        response = await message.channel.send({
-          content: "Abre la plantilla obligatoria de instrucción.",
-          components: [new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`postulations:instruction:${message.id}`)
-              .setLabel("Rellenar plantilla").setStyle(ButtonStyle.Primary)
-          )]
-        });
-        const onlyExecutor = (interaction) => {
-          if (interaction.user.id === message.author.id) return true;
-          interaction.reply({ content: "Solo quien ejecutó el comando puede continuar.", ephemeral: true }).catch(() => {});
+        const targetMember = await target(context);
+        try {
+          response = await targetMember.user.send({
+            content: "📋 Debes completar la plantilla obligatoria para finalizar tu instrucción EMS.",
+            components: [new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setCustomId(`postulations:instruction:${message.id}`)
+                .setLabel("Rellenar plantilla").setStyle(ButtonStyle.Primary)
+            )]
+          });
+        } catch {
+          throw new UserFacingError(`${EMS} **No puedo enviar la plantilla por MD a ${targetMember}. Debe permitir mensajes directos del servidor.**`);
+        }
+        const onlyTarget = (interaction) => {
+          if (interaction.user.id === targetMember.id) return true;
+          interaction.reply({ content: "Esta plantilla pertenece a otra persona.", ephemeral: true }).catch(() => {});
           return false;
         };
         let opener;
         try {
-          opener = await response.awaitMessageComponent({ componentType: ComponentType.Button, time: 120000, filter: onlyExecutor });
+          opener = await response.awaitMessageComponent({ componentType: ComponentType.Button, time: 900000, filter: onlyTarget });
         } catch (error) {
           if (error.code !== "InteractionCollectorError") throw error;
           return;
@@ -199,17 +204,16 @@ function register(client, rootConfig) {
         await response.delete().catch(() => {});
         response = null;
         try {
-          instructionModal = await opener.awaitModalSubmit({ time: 300000, filter: onlyExecutor });
+          instructionModal = await opener.awaitModalSubmit({ time: 300000, filter: onlyTarget });
         } catch (error) {
           if (error.code !== "InteractionCollectorError") throw error;
           return;
         }
         const nameIc = instructionModal.fields.getTextInputValue("name-ic").trim();
         await instructionModal.deferReply({ ephemeral: true });
-        const member = await target(context);
-        await publishInstructionTemplate(nameIc, member);
+        await publishInstructionTemplate(nameIc, targetMember);
         await handle(context);
-        await instructionModal.editReply(`${HEART} **Plantilla registrada e instrucción aprobada** para ${member}.`);
+        await instructionModal.editReply(`${HEART} **Plantilla registrada e instrucción aprobada correctamente.**`);
         return;
       }
       await handle(context);
