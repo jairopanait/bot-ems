@@ -12,6 +12,37 @@ const PANEL_CHANNEL_ID = "1568448649833480360";
 const BUTTON_ACTIONS = { "otc:in": "in", "otc:out": "out" };
 const MODAL_PREFIX = "otc:password:";
 
+function formatTime(date, timeZone) {
+  return new Intl.DateTimeFormat("es-ES", { timeZone, hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
+}
+
+function timeFromOtc(value) {
+  const match = String(value ?? "").match(/(?:T|\s)(\d{1,2}:\d{2})/);
+  return match ? match[1].padStart(5, "0") : "No disponible";
+}
+
+function formatDuration(startedAt, finishedAt) {
+  const start = Date.parse(startedAt);
+  if (!Number.isFinite(start)) return "No disponible";
+  const minutes = Math.max(0, Math.floor((finishedAt.getTime() - start) / 60000));
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+
+function exitReceipt(result) {
+  const exitTime = formatTime(result.confirmedAt, result.timeZone || "Europe/Madrid");
+  return new EmbedBuilder()
+    .setColor(0xf1c40f)
+    .setTitle("🔴 Salida de Servicio")
+    .addFields(
+      { name: "👤 Empleado", value: String(result.employeeName || "No disponible"), inline: true },
+      { name: "🟢 Entrada", value: timeFromOtc(result.startedAt), inline: true },
+      { name: "🔴 Salida", value: exitTime, inline: true },
+      { name: "⏱️ Duración", value: formatDuration(result.startedAt, result.confirmedAt), inline: false }
+    )
+    .setFooter({ text: "Panel EMS · Company 136217" })
+    .setTimestamp(result.confirmedAt);
+}
+
 function register(client, config, { otc = createOtcClient(), now = Date.now, credentials = createCredentialStore(config.dataDir, config.guildId) } = {}) {
   const store = createJsonStore(config.dataDir, "otc-panel.json", { panelMessageId: null });
   const sessions = new Map();
@@ -76,7 +107,10 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
       } else credential = credentials.get(userId);
       if (!credential) throw new OtcAuthError("Introduce tu contraseña de OTC para vincular tu cuenta.");
       const result = await otc.clock({ discordId: userId, credential, action });
-      await interaction.editReply({ content: `✅ ${result.action === "in" ? "ENTRADA" : "SALIDA"} registrada en OpenTimeClock.`, components: [], allowedMentions: { parse: [] } });
+      const payload = result.action === "out"
+        ? { content: "", embeds: [exitReceipt(result)], components: [], allowedMentions: { parse: [] } }
+        : { content: "✅ ENTRADA registrada en OpenTimeClock.", components: [], allowedMentions: { parse: [] } };
+      await interaction.editReply(payload);
     } catch (error) {
       if (!(error instanceof OtcAuthError)) throw error;
       // A changed password requires renewal, not silent repeated login attempts.
