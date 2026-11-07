@@ -15,6 +15,7 @@ const LINES = [
 
 function register(client, config) {
   let quietTimer = null;
+  let lastSnapshot = null;
   const mentions = (members) => members.length ? members.map((member) => `<@${member.id}>`).join(" · ") : "—";
 
   async function publish() {
@@ -31,6 +32,8 @@ function register(client, config) {
         return `**${label}: ${mentions(members)}**`;
       })
     ];
+    const snapshot = lines.join("\n");
+    if (snapshot === lastSnapshot) return;
     const embed = new EmbedBuilder()
       .setColor(0x2ecc71)
       .setTitle("Doctor Salidorro EMS")
@@ -38,6 +41,7 @@ function register(client, config) {
       .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊 · Actualización automática" })
       .setTimestamp();
     await panelChannel.send({ embeds: [embed], allowedMentions: { parse: [] } });
+    lastSnapshot = snapshot;
   }
 
   function schedulePublish() {
@@ -51,6 +55,7 @@ function register(client, config) {
 
   client.on(Events.VoiceStateUpdate, (oldState, newState) => {
     if (oldState.guild.id !== config.guildId && newState.guild.id !== config.guildId) return;
+    if (oldState.channelId === newState.channelId) return;
     schedulePublish();
   });
   client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
