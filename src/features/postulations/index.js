@@ -182,7 +182,8 @@ function register(client, rootConfig) {
             )],
             allowedMentions: { users: [targetMember.id] }
           });
-          const timer = setTimeout(() => response.delete().catch(() => {}), 600000);
+          const temporaryMessage = response;
+          const timer = setTimeout(() => temporaryMessage.delete().catch(() => {}), 600000);
           timer.unref();
         } catch {
           throw new UserFacingError(`${EMS} **No puedo enviar la plantilla al canal configurado. Revisa los permisos del bot.**`);
