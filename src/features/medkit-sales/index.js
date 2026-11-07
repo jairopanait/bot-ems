@@ -16,7 +16,7 @@ function register(client, config) {
   const sessions = new Map();
 
   client.on(Events.MessageCreate, async (message) => {
-    if (!message.inGuild() || message.author.bot || !/^!ventas\s*$/i.test(message.content.trim())) return;
+    if (!message.inGuild() || message.author.bot || !/^!venta\s*$/i.test(message.content.trim())) return;
     let prompt;
     try {
       const seller = await message.guild.members.fetch(message.author.id);
