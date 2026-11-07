@@ -87,17 +87,15 @@ function register(client, config) {
       const output = await client.channels.fetch(OUTPUT_CHANNEL_ID).catch(() => null);
       if (!output?.isTextBased() || output.guildId !== config.guildId) throw new Error("Canal de registro de ventas no válido.");
       const embed = new EmbedBuilder()
-        .setColor(0x2ecc71)
-        .setAuthor({ name: "Doctor Salidorro EMS · Ventas" })
+        .setColor(0x7b1113)
         .setTitle("💊 Venta de medkits registrada")
-        .setDescription("Registro automático de la venta y su reparto.")
         .addFields(
           { name: "👤 Persona que hizo la venta", value: `<@${submission.user.id}> · ${submission.user.tag}`, inline: false },
-          { name: "🆔 ID al que vendió", value: `\`${buyerId}\``, inline: true },
-          { name: "💊 Nº Medkits", value: String(medkits), inline: true },
-          { name: "💰 Total de la venta", value: currency(total), inline: true },
-          { name: "🏥 Porcentaje para el Hospital · 80%", value: currency(hospital), inline: true },
-          { name: "🩸 Porcentaje para el EMS · 20%", value: currency(ems), inline: true }
+          { name: "🆔 ID al que vendió", value: `\`${buyerId}\``, inline: false },
+          { name: "💊 Nº Medkits", value: String(medkits), inline: false },
+          { name: "💰 Total de la venta", value: currency(total), inline: false },
+          { name: "🏥 Porcentaje para el Hospital · 80%", value: currency(hospital), inline: false },
+          { name: "🩸 Porcentaje para el EMS · 20%", value: currency(ems), inline: false }
         )
         .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊" })
         .setTimestamp();
