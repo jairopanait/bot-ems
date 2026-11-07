@@ -178,35 +178,39 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
 
   async function resumeActivityChecks() {
     const data = activityData();
+    for (const userId of Object.keys(data.active)) cancelActivityTimer(userId);
     for (const record of Object.values(data.active)) record.pending = false;
     saveActivity(data.active);
-    for (const [userId, record] of Object.entries(data.active)) {
-      scheduleActivityCheck(userId, Math.max(0, Number(record.nextCheckAt || now()) - now()));
-    }
 
-    // An active shift may have been started before a Railway restart or deploy.
-    // Check a few saved OTC accounts at a time and notify each active user immediately.
+    // On each Railway start, refresh every saved OTC account instead of trusting
+    // an old timer. Anyone currently clocked in receives a new check immediately.
     const storedUserIds = typeof credentials.listUserIds === "function" ? credentials.listUserIds() : [];
-    const candidates = storedUserIds.filter((userId) => !data.active[userId]);
-    console.log(`Verificación OTC: ${storedUserIds.length} cuentas guardadas; ${candidates.length} por revisar.`);
+    console.log(`Verificación OTC: revisando ${storedUserIds.length} cuentas guardadas.`);
     let cursor = 0;
     async function recoverNext() {
-      while (cursor < candidates.length) {
-        const userId = candidates[cursor++];
+      while (cursor < storedUserIds.length) {
+        const userId = storedUserIds[cursor++];
         try {
           const shift = await otc.getCurrentShift({ discordId: userId, credential: credentials.get(userId) });
-          if (shift.state.toio !== "out") continue;
+          if (shift.state.toio !== "out") {
+            if (data.active[userId]) {
+              delete data.active[userId];
+              saveActivity(data.active);
+            }
+            continue;
+          }
           data.active[userId] = { startedAt: shift.state.sInDateTime, nextCheckAt: now(), pending: false };
           saveActivity(data.active);
           scheduleActivityCheck(userId, 0);
-          console.log("Verificación OTC: fichaje activo detectado.");
+          console.log("Verificación OTC: fichaje activo detectado; aviso programado.");
         } catch (error) {
-          // A single unavailable or invalid OTC account must not block the other checks.
+          // Keep a previous pending check so a transient OTC failure can retry later.
+          if (data.active[userId]) scheduleActivityCheck(userId, ACTIVITY_RETRY_MS);
           console.warn("Verificación OTC: no se pudo consultar una cuenta guardada.", error instanceof Error ? error.message : "Error desconocido");
         }
       }
     }
-    await Promise.all(Array.from({ length: Math.min(5, candidates.length) }, recoverNext));
+    await Promise.all(Array.from({ length: Math.min(5, storedUserIds.length) }, recoverNext));
   }
 
   async function publishPanel() {
