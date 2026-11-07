@@ -6,6 +6,7 @@ const { sendCommandLog } = require("../command-logs");
 
 const OUTPUT_CHANNEL_ID = "1129103844517888131";
 const NOTIFY_ROLE_ID = "1129103460361576589";
+const ALLOWED_ROLE_ID = "1129103467294769214";
 const BUTTON_PREFIX = "rank-request:open:";
 const MODAL_PREFIX = "rank-request:form:";
 
@@ -38,6 +39,12 @@ function register(client, config) {
     if (!message.inGuild() || message.author.bot || !/^!rango\s*$/i.test(message.content.trim())) return;
     let prompt;
     try {
+      const requester = await message.guild.members.fetch(message.author.id);
+      if (!requester.roles.cache.has(ALLOWED_ROLE_ID)) {
+        await message.delete();
+        await message.author.send("No tienes permiso para usar `!rango`.").catch(() => {});
+        return;
+      }
       await message.delete();
       prompt = await message.channel.send({
         content: `<@${message.author.id}> abre el formulario para solicitar tu rango IC.`,
