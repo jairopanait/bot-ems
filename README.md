@@ -95,3 +95,13 @@ npm run check
 ```
 
 Nunca subas `.env` ni el token a GitHub.
+
+## Fichaje OpenTimeClock desde Discord
+
+El módulo `otc` publica un panel con **ENTRADA** (verde) y **SALIDA** (rojo) en el canal `1568448649833480360`. Utiliza la compañía **EMS-LANARANJARP**, ID `136217`, producto T1. El mensaje se reutiliza al reiniciar mediante `otc-panel.json`, en el mismo volumen de datos del bot.
+
+Cada pulsación abre un formulario privado para la contraseña de OTC. El usuario es siempre el ID de Discord de quien pulsa: no se permite fichar por otra persona. El bot no guarda contraseñas ni sus hashes en archivos, sesiones o logs. Cada formulario caduca en cinco minutos y es de un solo uso. Las confirmaciones y errores son privados; los fichajes que OTC acepta se registran en el canal habitual de logs.
+
+La integración utiliza las solicitudes del cliente web T1, no una API pública de escritura con estabilidad garantizada. Comprueba contraseña, compañía, estado de entrada/salida y requisitos adicionales antes de enviar el fichaje. Ante requisitos de cámara, ubicación, trabajos o turnos adicionales, remite al usuario a la web. No reintenta escrituras de resultado incierto y no inventa ubicación, IP ni dispositivo. Solo confirma el resultado `SUCCESS` de OTC.
+
+Validación local: `npm run test:otc`. Las pruebas simulan OTC y Discord; no fichan en cuentas reales. Tras desplegar, comprobar una entrada y una salida con una cuenta autorizada y verificar ambos registros en OTC. No subir contraseñas a GitHub ni incluirlas en capturas de errores.
