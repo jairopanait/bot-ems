@@ -19,6 +19,7 @@ const botGuidePanel = require("./features/bot-guide-panel");
 const writtenPostulationsGuide = require("./features/written-postulations-guide");
 const instructionGuide = require("./features/instruction-guide");
 const operationsGuidePanels = require("./features/operations-guide-panels");
+const resignationGuide = require("./features/resignation-guide");
 
 const client = new Client({
   intents: [
@@ -30,7 +31,7 @@ const client = new Client({
   ]
 });
 
-const features = [birthdays, postulations, faction, inactivity, h50, emsQuestionnaire, resignations, commandLogs, otc, rankRequest, voiceDistribution, noticeRoles, medkitSales, roleCommandsPanel, botGuidePanel, writtenPostulationsGuide, instructionGuide, operationsGuidePanels];
+const features = [birthdays, postulations, faction, inactivity, h50, emsQuestionnaire, resignations, commandLogs, otc, rankRequest, voiceDistribution, noticeRoles, medkitSales, roleCommandsPanel, botGuidePanel, writtenPostulationsGuide, instructionGuide, operationsGuidePanels, resignationGuide];
 for (const feature of features) feature.register(client, config);
 
 client.once(Events.ClientReady, async (readyClient) => {
