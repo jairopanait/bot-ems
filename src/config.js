@@ -28,6 +28,7 @@ module.exports = Object.freeze({
   },
   postulations: {
     announcementChannelId: value("POSTULATIONS_ANNOUNCEMENT_CHANNEL_ID", "1129103811168968734"),
+    instructionTemplateChannelId: value("INSTRUCTION_TEMPLATE_CHANNEL_ID", "1129103823496020029"),
     writtenCommandRoleIds: ["1135516317097660538", "1129103460361576589"],
     oralCommandRoleIds: ["1129103424311541790"],
     writtenApprovedRoleIds: ["1129103421421658193", "1542969949478191224"],
