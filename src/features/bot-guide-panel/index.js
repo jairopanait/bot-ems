@@ -25,7 +25,7 @@ function register(client, config) {
         { name: "🩺 Panel H-50", value: "**Entrada H-50:** añade el rol H-50. **Salida H-50:** retira ese rol.\n**Uso:** desde el panel H-50 correspondiente." },
                 { name: "📄 Cuestionario obligatorio EMS", value: "**Plantilla para aspirantes EMS.** La persona responde una pregunta cada vez: Nombre IC, edad OOC, experiencia, disponibilidad y aportación a la facción. Al terminar, el bot reúne las respuestas y las envía al canal de revisión.\n**Uso:** desde el panel del cuestionario EMS." },
         { name: "📢 Avisos y roles", value: "**Canal de avisos:** al mencionar usuario y rol de aviso añade el rol y el rol común. Si el aviso dice `apelado`, retira los avisos mencionados. El rol común se retira al no quedar ningún aviso activo." },
-        { name: "🔊 Distribución de voz", value: "**Distribución obligatoria.** Tras 15 segundos sin movimientos, publica quién está en cada canal de voz y los H-50. También actualiza al añadir o retirar el rol H-50. No guarda registros." },
+        { name: "🔊 Distribución de voz", value: "**Distribución obligatoria.** Tras 15 segundos sin movimientos, publica quién está en cada canal de voz y los H-50. También actualiza al añadir o retirar el rol H-50. Si todos los canales vigilados quedan vacíos, menciona a <@&1129103467294769214> con **CIUDAD SOLA**. No guarda registros." },
         { name: "⚖️ Gestión de facción", value: "**Canal de salidas/expulsiones:** permite elegir descenso o expulsión, por horas o por conducta; aplica roles de expulsión y blacklist cuando corresponde." }
       )
       .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊 · Guía automática" })
