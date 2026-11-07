@@ -1,4 +1,4 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, Events, ModalBuilder, StringSelectMenuBuilder, TextInputBuilder, TextInputStyle } = require("discord.js");
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, ComponentType, Events, ModalBuilder, StringSelectMenuBuilder, TextInputBuilder, TextInputStyle } = require("discord.js");
 const { createJsonStore } = require("../../storage");
 
 const commands = [];
@@ -97,6 +97,7 @@ function register(client, rootConfig) {
     let reason;
     let privatePanel;
     let instructionModal;
+    let instructionThread;
     const context = {
       guild: message.guild,
       user: message.author,
@@ -172,15 +173,28 @@ function register(client, rootConfig) {
       if (context.commandName === "instruccionaprobada") {
         const targetMember = await target(context);
         try {
-          response = await targetMember.user.send({
-            content: "📋 Debes completar la plantilla obligatoria para finalizar tu instrucción EMS.",
+          const deliveryChannel = await client.channels.fetch(config.instructionDeliveryChannelId).catch(() => null);
+          if (!deliveryChannel?.threads?.create) throw new Error("Canal no válido");
+          instructionThread = await deliveryChannel.threads.create({
+            name: `Plantilla instrucción · ${targetMember.user.username}`.slice(0, 100),
+            type: ChannelType.PrivateThread,
+            invitable: false,
+            autoArchiveDuration: 60,
+            reason: `Plantilla de instrucción para ${targetMember.user.tag}`
+          });
+          await instructionThread.members.add(targetMember.id);
+          const timer = setTimeout(() => instructionThread.delete("Plantilla de instrucción caducada").catch(() => {}), 600000);
+          timer.unref();
+          response = await instructionThread.send({
+            content: `<@${targetMember.id}> 📋 Debes completar la plantilla obligatoria para finalizar tu instrucción EMS.`,
             components: [new ActionRowBuilder().addComponents(
               new ButtonBuilder().setCustomId(`postulations:instruction:${message.id}`)
                 .setLabel("Rellenar plantilla").setStyle(ButtonStyle.Primary)
-            )]
+            )],
+            allowedMentions: { users: [targetMember.id] }
           });
         } catch {
-          throw new UserFacingError(`${EMS} **No puedo enviar la plantilla por MD a ${targetMember}. Debe permitir mensajes directos del servidor.**`);
+          throw new UserFacingError(`${EMS} **No puedo crear la plantilla privada para ${targetMember}. Revisa que el bot tenga permisos de crear y gestionar hilos privados.**`);
         }
         const onlyTarget = (interaction) => {
           if (interaction.user.id === targetMember.id) return true;
@@ -189,7 +203,7 @@ function register(client, rootConfig) {
         };
         let opener;
         try {
-          opener = await response.awaitMessageComponent({ componentType: ComponentType.Button, time: 900000, filter: onlyTarget });
+          opener = await response.awaitMessageComponent({ componentType: ComponentType.Button, time: 600000, filter: onlyTarget });
         } catch (error) {
           if (error.code !== "InteractionCollectorError") throw error;
           return;
@@ -201,7 +215,7 @@ function register(client, rootConfig) {
               .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100)
           ));
         await opener.showModal(modal);
-        await response.delete().catch(() => {});
+        await response.edit({ content: `<@${targetMember.id}> La plantilla está abierta. Complétala antes de que caduque.`, components: [], allowedMentions: { users: [targetMember.id] } }).catch(() => {});
         response = null;
         try {
           instructionModal = await opener.awaitModalSubmit({ time: 300000, filter: onlyTarget });
@@ -229,7 +243,7 @@ function register(client, rootConfig) {
       }
     } finally {
       if (privatePanel) await privatePanel.deleteReply().catch(() => {});
-      if (response) await response.delete().catch(() => {});
+      if (response && !instructionThread) await response.delete().catch(() => {});
     }
   });
 
