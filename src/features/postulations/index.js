@@ -1,16 +1,7 @@
-const { Events, SlashCommandBuilder } = require("discord.js");
+const { ActionRowBuilder, ComponentType, Events, SlashCommandBuilder, StringSelectMenuBuilder } = require("discord.js");
 const { createJsonStore } = require("../../storage");
 
 const commands = [
-  new SlashCommandBuilder().setName("aceptarescrita").setDescription("Aprueba la postulación escrita de un usuario.")
-    .addUserOption((option) => option.setName("usuario").setDescription("Usuario aprobado.").setRequired(true)),
-  new SlashCommandBuilder().setName("rechazarpostulacion").setDescription("Rechaza la postulación escrita de un usuario.")
-    .addUserOption((option) => option.setName("usuario").setDescription("Usuario rechazado.").setRequired(true))
-    .addStringOption((option) => option.setName("motivo").setDescription("Motivo del rechazo.").setRequired(true).addChoices(
-      { name: "Sanciones administrativas", value: "sanciones" },
-      { name: "Edad mínima insuficiente", value: "edad" },
-      { name: "Plantilla mal rellenada", value: "plantilla" }
-    )),
   new SlashCommandBuilder().setName("instruccionaprobada").setDescription("Aprueba la instrucción de un usuario.")
     .addUserOption((option) => option.setName("usuario").setDescription("Usuario aprobado.").setRequired(true)),
   new SlashCommandBuilder().setName("instruccionsuspensa").setDescription("Suspende la instrucción de un usuario.")
@@ -95,6 +86,66 @@ function register(client, rootConfig) {
     await announce(`${EMS} **¡Lo sentimos, ${member}, no consiguió aprobar esta instrucción!**\n\n${HEART} **En la siguiente será. ¡ÁNIMO!**`);
     return interaction.editReply(`${HEART} **Instrucción suspensa** para ${member}. No se ha añadido ningún rol.`);
   }
+
+  client.on(Events.MessageCreate, async (message) => {
+    if (!message.inGuild() || message.author.bot) return;
+    const match = message.content.trim().match(/^!(aceptar|rechazar)\s+<@!?(\d{17,20})>\s*$/i);
+    if (!match) return;
+    let response;
+    let reason;
+    const context = {
+      guild: message.guild,
+      user: message.author,
+      commandName: match[1].toLowerCase() === "aceptar" ? "aceptarescrita" : "rechazarpostulacion",
+      options: { getUser: () => ({ id: match[2] }), getString: () => reason },
+      deferReply: async () => {},
+      editReply: async (content) => {
+        if (response) return response.edit({ content, components: [], allowedMentions: { parse: [] } });
+        response = await message.reply({ content, allowedMentions: { parse: [] } });
+        return response;
+      }
+    };
+    try {
+      await requireAnyRole(context, config.writtenCommandRoleIds);
+      await target(context);
+      if (context.commandName === "rechazarpostulacion") {
+        response = await message.reply({
+          content: `Selecciona el motivo del rechazo para <@${match[2]}>.`,
+          allowedMentions: { parse: [] },
+          components: [new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder().setCustomId(`postulations:reject:${message.id}`)
+              .setPlaceholder("Motivo del rechazo").addOptions(
+                { label: "Sanciones administrativas", value: "sanciones" },
+                { label: "Edad mínima insuficiente", value: "edad" },
+                { label: "Plantilla mal rellenada", value: "plantilla" }
+              )
+          )]
+        });
+        let selection;
+        try {
+          selection = await response.awaitMessageComponent({
+            componentType: ComponentType.StringSelect,
+            time: 120000,
+            filter: (interaction) => {
+              if (interaction.user.id === message.author.id) return true;
+              interaction.reply({ content: "Solo quien ejecutó el comando puede elegir el motivo.", ephemeral: true }).catch(() => {});
+              return false;
+            }
+          });
+        } catch (error) {
+          if (error.code !== "InteractionCollectorError") throw error;
+          return context.editReply("La selección ha caducado. Ejecuta de nuevo `!rechazar @usuario`.");
+        }
+        reason = selection.values[0];
+        await selection.deferUpdate();
+      }
+      await handle(context);
+    } catch (error) {
+      console.error("Error en postulaciones:", error);
+      const content = error instanceof UserFacingError ? error.message : `${EMS} **Ha fallado el comando. Revisa permisos y jerarquía de roles.**`;
+      await context.editReply(content).catch(() => {});
+    }
+  });
 
   client.on(Events.InteractionCreate, async (interaction) => {
     if (!interaction.isChatInputCommand() || !commands.some((command) => command.name === interaction.commandName)) return;
