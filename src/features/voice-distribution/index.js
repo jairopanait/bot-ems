@@ -1,6 +1,7 @@
 const { EmbedBuilder, Events } = require("discord.js");
 const PANEL_CHANNEL_ID = "1129104016912154644";
 const H50_ROLE_ID = "1543639741751103609";
+const CITY_ALONE_ROLE_ID = "1129103467294769214";
 const LINES = [
   { label: "🚁 UNIDAD UEA", channelId: "1129104126429638717" },
   { label: "🏍️ UNIDAD UEM", channelId: "1542653776828178572" },
@@ -16,6 +17,7 @@ const LINES = [
 function register(client, config) {
   let quietTimer = null;
   let lastSnapshot = null;
+  let cityIsAlone = false;
   const mentions = (members) => members.length ? members.map((member) => `<@${member.id}>`).join(" · ") : "—";
 
   async function publish() {
@@ -24,16 +26,26 @@ function register(client, config) {
     if (!panelChannel?.isTextBased() || panelChannel.guildId !== config.guildId) throw new Error("Canal de distribución no válido.");
     await guild.members.fetch().catch(() => {});
     const h50Members = [...guild.members.cache.values()].filter((member) => !member.user.bot && member.roles.cache.has(H50_ROLE_ID));
+    const voiceLines = LINES.map(({ label, channelId }) => {
+      const channel = guild.channels.cache.get(channelId);
+      const members = channel?.isVoiceBased() ? [...channel.members.values()].filter((member) => !member.user.bot) : [];
+      return { label, members };
+    });
     const lines = [
       `**🧑🏼‍⚕️ H-50: ${mentions(h50Members)}**`,
-      ...LINES.map(({ label, channelId }) => {
-        const channel = guild.channels.cache.get(channelId);
-        const members = channel?.isVoiceBased() ? [...channel.members.values()].filter((member) => !member.user.bot) : [];
-        return `**${label}: ${mentions(members)}**`;
-      })
+      ...voiceLines.map(({ label, members }) => `**${label}: ${mentions(members)}**`)
     ];
     const snapshot = lines.join("\n");
     if (snapshot === lastSnapshot) return;
+    const noOneInDistribution = voiceLines.every(({ members }) => members.length === 0);
+    if (noOneInDistribution) {
+      lastSnapshot = snapshot;
+      if (cityIsAlone) return;
+      cityIsAlone = true;
+      await panelChannel.send({ content: `<@&${CITY_ALONE_ROLE_ID}> **CIUDAD SOLA**`, allowedMentions: { roles: [CITY_ALONE_ROLE_ID] } });
+      return;
+    }
+    cityIsAlone = false;
     const embed = new EmbedBuilder()
       .setColor(0x2ecc71)
       .setTitle("Doctor Salidorro EMS")
