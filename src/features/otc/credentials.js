@@ -40,6 +40,10 @@ function createCredentialStore(dataDir, guildId) {
         return value;
       } catch { throw new Error("No se pudo descifrar el acceso OTC guardado."); }
     },
+    listUserIds() {
+      const prefix = `${guildId}:`;
+      return Object.keys(read()).filter((entry) => entry.startsWith(prefix)).map((entry) => entry.slice(prefix.length));
+    },
     set(userId, credential) {
       if (!/^[a-f0-9]{32}$/.test(credential)) throw new Error("Credencial OTC no válida.");
       const masterKey = key(true);
