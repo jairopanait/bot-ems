@@ -39,7 +39,7 @@ function exitReceipt(result) {
       { name: "🔴 Salida", value: exitTime, inline: true },
       { name: "⏱️ Duración", value: formatDuration(result.startedAt, result.confirmedAt), inline: false }
     )
-    .setFooter({ text: "Panel EMS · Company 136217" })
+    .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊" })
     .setTimestamp(result.confirmedAt);
 }
 
