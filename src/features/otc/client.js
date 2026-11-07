@@ -46,9 +46,9 @@ function createOtcClient({ fetchImpl = globalThis.fetch } = {}) {
     return { user, credential: md5Password };
   }
 
-  async function clock({ discordId, password, credential, action }) {
-    if (!["in", "out"].includes(action)) throw new OtcError("Solicitud de fichaje no válida.");
-    const { user } = await authenticate({ discordId, password, credential });
+  async function getCurrentShift({ discordId, password, credential }) {
+    if (!/^[0-9]{17,20}$/.test(discordId)) throw new OtcError("Solicitud de fichaje no válida.");
+    const { user, credential: validatedCredential } = await authenticate({ discordId, password, credential });
     const companies = await request("web/sGetCompanyById");
     const company = Array.isArray(companies) && companies.length === 1 ? companies[0] : null;
     if (!company || String(company.CompanyId) !== String(COMPANY_ID) || company.CompanyName !== COMPANY_NAME) {
@@ -64,13 +64,17 @@ function createOtcClient({ fetchImpl = globalThis.fetch } = {}) {
     const timeZone = String(user.TimeZoneRule) === "0" ? company.HeadOfficeTimeZone : user.TimeZone;
     try { new Intl.DateTimeFormat("es-ES", { timeZone }).format(); } catch { throw new OtcError("No se pudo comprobar tu zona horaria de OTC."); }
     if (!timeZone) throw new OtcError("No se pudo comprobar tu zona horaria de OTC.");
-    const stateParameters = {
-      userId: String(user.UserId), timeZone, featureWeeklyShiftPlan: company.FeatureWeeklyShiftPlan
-    };
+    const stateParameters = { userId: String(user.UserId), timeZone, featureWeeklyShiftPlan: company.FeatureWeeklyShiftPlan };
     const state = await request("web/sGetUserInfo", stateParameters);
     if (!state || !["in", "out"].includes(state.toio) || state.timecardId === undefined || state.jobId === undefined || state.sInDateTime === undefined) {
       throw new OtcError("No se pudo comprobar tu estado actual. Revisa tu fichaje en OTC.");
     }
+    return { user, credential: validatedCredential, company, state, timeZone };
+  }
+
+  async function clock({ discordId, password, credential, action }) {
+    if (!["in", "out"].includes(action)) throw new OtcError("Solicitud de fichaje no válida.");
+    const { user, company, state, timeZone } = await getCurrentShift({ discordId, password, credential });
     if (state.toio !== action) {
       throw new OtcError(action === "in" ? "Ya tienes una entrada activa en OTC. No se ha creado otra." : "No tienes una entrada activa en OTC. No se ha registrado una salida.");
     }
@@ -86,11 +90,10 @@ function createOtcClient({ fetchImpl = globalThis.fetch } = {}) {
       lateLimitTime: user.LateLimitTime, lateLimitTimeSaved: user.LateLimitTimeSaved,
       noBreakLockOut: user.NoBreakLockOut, noBreakLockOutHours: user.NoBreakLockOutHours
     });
-    // Never retry writes, or interpret an arbitrary successful HTTP response as a punch.
     if (result !== "SUCCESS") throw new OtcError("OTC no ha confirmado el fichaje. Revisa tu estado en su web antes de volver a intentarlo.");
     return { action, confirmedAt: new Date(), employeeName: user.FullName || [user.FirstName, user.LastName].filter(Boolean).join(" ") || user.Name || user.UserName || discordId, startedAt: state.sInDateTime, timeZone };
   }
-  return { clock, authenticate };
+  return { clock, authenticate, getCurrentShift };
 }
 
 module.exports = { createOtcClient, OtcError, OtcAuthError, COMPANY_NAME };
