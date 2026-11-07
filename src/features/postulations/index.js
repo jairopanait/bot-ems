@@ -1,4 +1,4 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, ComponentType, Events, ModalBuilder, StringSelectMenuBuilder, TextInputBuilder, TextInputStyle } = require("discord.js");
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, Events, ModalBuilder, StringSelectMenuBuilder, TextInputBuilder, TextInputStyle } = require("discord.js");
 const { createJsonStore } = require("../../storage");
 
 const commands = [];
@@ -97,7 +97,6 @@ function register(client, rootConfig) {
     let reason;
     let privatePanel;
     let instructionModal;
-    let instructionThread;
     const context = {
       guild: message.guild,
       user: message.author,
@@ -174,18 +173,8 @@ function register(client, rootConfig) {
         const targetMember = await target(context);
         try {
           const deliveryChannel = await client.channels.fetch(config.instructionDeliveryChannelId).catch(() => null);
-          if (!deliveryChannel?.threads?.create) throw new Error("Canal no válido");
-          instructionThread = await deliveryChannel.threads.create({
-            name: `Plantilla instrucción · ${targetMember.user.username}`.slice(0, 100),
-            type: ChannelType.PrivateThread,
-            invitable: false,
-            autoArchiveDuration: 60,
-            reason: `Plantilla de instrucción para ${targetMember.user.tag}`
-          });
-          await instructionThread.members.add(targetMember.id);
-          const timer = setTimeout(() => instructionThread.delete("Plantilla de instrucción caducada").catch(() => {}), 600000);
-          timer.unref();
-          response = await instructionThread.send({
+          if (!deliveryChannel?.isTextBased()) throw new Error("Canal no válido");
+          response = await deliveryChannel.send({
             content: `<@${targetMember.id}> 📋 Debes completar la plantilla obligatoria para finalizar tu instrucción EMS.`,
             components: [new ActionRowBuilder().addComponents(
               new ButtonBuilder().setCustomId(`postulations:instruction:${message.id}`)
@@ -193,8 +182,10 @@ function register(client, rootConfig) {
             )],
             allowedMentions: { users: [targetMember.id] }
           });
+          const timer = setTimeout(() => response.delete().catch(() => {}), 600000);
+          timer.unref();
         } catch {
-          throw new UserFacingError(`${EMS} **No puedo crear la plantilla privada para ${targetMember}. Revisa que el bot tenga permisos de crear y gestionar hilos privados.**`);
+          throw new UserFacingError(`${EMS} **No puedo enviar la plantilla al canal configurado. Revisa los permisos del bot.**`);
         }
         const onlyTarget = (interaction) => {
           if (interaction.user.id === targetMember.id) return true;
@@ -243,7 +234,7 @@ function register(client, rootConfig) {
       }
     } finally {
       if (privatePanel) await privatePanel.deleteReply().catch(() => {});
-      if (response && !instructionThread) await response.delete().catch(() => {});
+      if (response) await response.delete().catch(() => {});
     }
   });
 
