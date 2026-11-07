@@ -85,7 +85,14 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
 
   function scheduleActivityCheck(userId, delay) {
     cancelActivityTimer(userId);
-    activityTimers.set(userId, setTimeout(() => requestActivityCheck(userId).catch(() => {}), Math.max(0, delay)));
+    activityTimers.set(userId, setTimeout(() => {
+      const record = activityData().active[userId];
+      if (!record) return;
+      const task = record.pending
+        ? closeForNoActivity(userId, record.startedAt)
+        : requestActivityCheck(userId);
+      task.catch(() => {});
+    }, Math.max(0, delay)));
   }
 
   function startActivityCheck(userId, startedAt) {
