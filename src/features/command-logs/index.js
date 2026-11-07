@@ -63,10 +63,6 @@ function register(client, config) {
 
   client.on(Events.MessageCreate, async (message) => {
     if (!message.inGuild() || message.author.bot) return;
-    if (/^!inactividades\s*$/i.test(message.content.trim())) {
-      await logUse({ executorId: message.author.id, targetIds: [], command: "!inactividades", createdAt: message.createdAt, guildId: message.guildId });
-      return;
-    }
     const match = message.content.trim().match(/^!(aceptar|rechazar|renuncia|instruccion)\s+<@!?(\d{17,20})>\s*$/i);
     if (!match) return;
     await logUse({
