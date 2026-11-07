@@ -204,7 +204,7 @@ function register(client, rootConfig) {
           .setTitle("Plantilla de instrucción")
           .addComponents(new ActionRowBuilder().addComponents(
             new TextInputBuilder().setCustomId("name-ic").setLabel("Nombre IC")
-              .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100)
+              .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(27)
           ));
         await opener.showModal(modal);
         await response.edit({ content: `<@${targetMember.id}> La plantilla está abierta. Complétala antes de que caduque.`, components: [], allowedMentions: { users: [targetMember.id] } }).catch(() => {});
@@ -218,6 +218,7 @@ function register(client, rootConfig) {
         const nameIc = instructionModal.fields.getTextInputValue("name-ic").trim();
         await instructionModal.deferReply({ ephemeral: true });
         await publishInstructionTemplate(nameIc, targetMember);
+        await targetMember.setNickname(`[🩸] ${nameIc}`, `Instrucción aprobada por ${message.author.tag}`);
         await handle(context);
         await instructionModal.editReply(`${HEART} **Plantilla registrada e instrucción aprobada correctamente.**`);
         return;
