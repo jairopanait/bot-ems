@@ -10,6 +10,8 @@ const {
   TextInputStyle
 } = require("discord.js");
 
+const { sendCommandLog } = require("../command-logs");
+
 const REASON_BUTTON_PREFIX = "resignation:reason:";
 const REASON_MODAL_PREFIX = "resignation:reason-modal:";
 const BLACKLIST_SELECT_PREFIX = "resignation:blacklist:";
@@ -58,10 +60,22 @@ function register(client, rootConfig) {
     const me = guild.members.me ?? await guild.members.fetchMe();
     const required = [PermissionFlagsBits.ManageRoles, PermissionFlagsBits.ManageNicknames, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages];
     if (!me.permissions.has(required)) throw new Error("Al bot le faltan permisos para gestionar roles, apodos o mensajes.");
-    const member = await guild.members.fetch(session.targetUserId);
+    const member = await guild.members.fetch({ user: session.targetUserId, force: true });
+    const previousRoles = [...member.roles.cache.values()]
+      .filter((role) => role.id !== guild.id)
+      .map((role) => ({ id: role.id, name: role.name }));
     const retainedRoleIds = config.preservedRoleIds.filter((roleId) => member.roles.cache.has(roleId));
     const roles = [...new Set([...retainedRoleIds, config.exitRoleId])];
-    await member.roles.set(roles, `Renuncia gestionada por ${session.executorTag}`);
+    const updatedMember = await member.roles.set(roles, `Renuncia gestionada por ${session.executorTag}`);
+    const removedRoles = previousRoles.filter((role) => !updatedMember.roles.cache.has(role.id));
+    await sendCommandLog(client, rootConfig, {
+      executorId: session.executorId,
+      targetIds: [member.id],
+      command: "!renuncia @usuario",
+      guildId: guild.id,
+      createdAt: new Date(),
+      removedRoles
+    });
     await member.setNickname(null, `Renuncia gestionada por ${session.executorTag}`);
     await publishTemplate(session, member);
   }

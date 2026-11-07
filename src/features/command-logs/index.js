@@ -1,11 +1,8 @@
-const { EmbedBuilder, Events } = require("discord.js");
+const { EmbedBuilder, Events, escapeMarkdown } = require("discord.js");
 
 const LOG_CHANNEL_ID = "1568442270120808569";
 
-function register(client, config) {
-  const commandNames = new Set(require("../../commands").map((command) => command.name));
-
-  async function logUse({ executorId, targetIds, command, createdAt, guildId }) {
+async function sendCommandLog(client, config, { executorId, targetIds, command, createdAt, guildId, removedRoles }) {
     if (guildId !== config.guildId) return;
     try {
       const channel = await client.channels.fetch(LOG_CHANNEL_ID);
@@ -19,21 +16,50 @@ function register(client, config) {
       }).format(createdAt);
       const embed = new EmbedBuilder()
         .setColor(0x2ecc71)
-        .setTitle("📋 Registro de comando")
+        .setTitle(removedRoles ? "📋 Renuncia · Roles retirados" : "📋 Registro de comando")
         .addFields(
           { name: "👤 Discord ID de quien usó el comando", value: person(executorId) },
           { name: "🎯 Persona a la que afectó", value: targetIds.length ? [...new Set(targetIds)].map(person).join("\n") : "No corresponde: comando de consulta." },
           { name: "⌨️ Comando que usó", value: `\`${command}\`` },
           { name: "📅 Día y hora", value: `${date} (Europe/Madrid)` }
         )
-        .setFooter({ text: "BOT EMS · Registro de uso; no confirma la finalización del comando" })
+        .setFooter({ text: removedRoles ? "BOT EMS · Cambio de roles confirmado" : "BOT EMS · Registro de uso; no confirma la finalización del comando" })
         .setTimestamp(createdAt);
-      await channel.send({ embeds: [embed], allowedMentions: { parse: [] } });
+      if (!removedRoles) {
+        await channel.send({ embeds: [embed], allowedMentions: { parse: [] } });
+        return;
+      }
+      const chunks = [];
+      let chunk = "";
+      for (const role of removedRoles) {
+        const line = `${escapeMarkdown(role.name)} · \`${role.id}\` · <@&${role.id}>`;
+        if (chunk && chunk.length + line.length + 1 > 950) {
+          chunks.push(chunk);
+          chunk = "";
+        }
+        chunk += `${chunk ? "\n" : ""}${line}`;
+      }
+      chunks.push(chunk || "No se retiró ningún rol.");
+      // Split long role lists without truncating the audit trail.
+      for (let index = 0; index < chunks.length; index += 4) {
+        const page = EmbedBuilder.from(embed.toJSON()).addFields(
+          chunks.slice(index, index + 4).map((value, offset) => ({
+            name: index + offset === 0 ? "🗑️ Roles retirados" : "🗑️ Roles retirados (continuación)", value
+          }))
+        );
+        await channel.send({ embeds: [page], allowedMentions: { parse: [] } });
+      }
     } catch (error) {
       // Logging failures must never prevent an existing command from running.
       console.error("No se pudo registrar el uso del comando:", error);
     }
   }
+
+
+function register(client, config) {
+  const commandNames = new Set(require("../../commands").map((command) => command.name));
+
+  const logUse = (entry) => sendCommandLog(client, config, entry);
 
   client.on(Events.MessageCreate, async (message) => {
     if (!message.inGuild() || message.author.bot) return;
@@ -70,4 +96,4 @@ function register(client, config) {
   });
 }
 
-module.exports = { name: "logs de comandos", commands: [], register };
+module.exports = { name: "logs de comandos", commands: [], register, sendCommandLog };
