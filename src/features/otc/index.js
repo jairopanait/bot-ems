@@ -177,24 +177,31 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
   async function resumeActivityChecks() {
     const data = activityData();
     for (const record of Object.values(data.active)) record.pending = false;
-    // An active shift may have been started before a Railway restart or deploy.
-    // Recover it from OTC so it receives the next hourly verification as well.
-    const storedUserIds = typeof credentials.listUserIds === "function" ? credentials.listUserIds() : [];
-    for (const userId of storedUserIds) {
-      if (data.active[userId]) continue;
-      try {
-        const shift = await otc.getCurrentShift({ discordId: userId, credential: credentials.get(userId) });
-        if (shift.state.toio === "out") {
-          data.active[userId] = { startedAt: shift.state.sInDateTime, nextCheckAt: now(), pending: false };
-        }
-      } catch {
-        // A single unavailable or invalid OTC account must not block the other checks.
-      }
-    }
     saveActivity(data.active);
     for (const [userId, record] of Object.entries(data.active)) {
       scheduleActivityCheck(userId, Math.max(0, Number(record.nextCheckAt || now()) - now()));
     }
+
+    // An active shift may have been started before a Railway restart or deploy.
+    // Check a few saved OTC accounts at a time and notify each active user immediately.
+    const storedUserIds = typeof credentials.listUserIds === "function" ? credentials.listUserIds() : [];
+    const candidates = storedUserIds.filter((userId) => !data.active[userId]);
+    let cursor = 0;
+    async function recoverNext() {
+      while (cursor < candidates.length) {
+        const userId = candidates[cursor++];
+        try {
+          const shift = await otc.getCurrentShift({ discordId: userId, credential: credentials.get(userId) });
+          if (shift.state.toio !== "out") continue;
+          data.active[userId] = { startedAt: shift.state.sInDateTime, nextCheckAt: now(), pending: false };
+          saveActivity(data.active);
+          scheduleActivityCheck(userId, 0);
+        } catch {
+          // A single unavailable or invalid OTC account must not block the other checks.
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(5, candidates.length) }, recoverNext));
   }
 
   async function publishPanel() {
