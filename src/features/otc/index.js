@@ -17,6 +17,7 @@ const HOURS_DEDUCTION_CHANNEL_ID = "1129103832346017842";
 const ACTIVITY_CHECK_PREFIX = "otc:active:";
 const ACTIVITY_INTERVAL_MS = 60 * 60 * 1000;
 const ACTIVITY_GRACE_MS = 5 * 60 * 1000;
+const ACTIVITY_RETRY_MS = 60 * 1000;
 
 function formatTime(date, timeZone) {
   return new Intl.DateTimeFormat("es-ES", { timeZone, hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
@@ -91,7 +92,10 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
       const task = record.pending
         ? closeForNoActivity(userId, record.startedAt)
         : requestActivityCheck(userId);
-      task.catch(() => {});
+      task.catch(() => {
+        // OTC can occasionally be unavailable; keep the pending verification and retry.
+        if (activityData().active[userId]) scheduleActivityCheck(userId, ACTIVITY_RETRY_MS);
+      });
     }, Math.max(0, delay)));
   }
 
@@ -136,11 +140,7 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
     const channel = await client.channels.fetch(PANEL_CHANNEL_ID).catch(() => null);
     if (!channel?.isTextBased()) throw new OtcError("No se encontró el canal del panel OTC.");
     const token = randomUUID();
-    record.pending = true;
-    record.nextCheckAt = now() + ACTIVITY_GRACE_MS;
-    saveActivity(data.active);
-    activitySessions.set(token, { userId, startedAt: record.startedAt, expiresAt: record.nextCheckAt });
-    scheduleActivityCheck(userId, ACTIVITY_GRACE_MS);
+    const expiresAt = now() + ACTIVITY_GRACE_MS;
     await channel.send({
       content: `<@${userId}> ¿sigues de servicio? Pulsa el botón **Sigo de servicio** en los próximos 5 minutos para mantener tu fichaje abierto.`,
       components: [new ActionRowBuilder().addComponents(
@@ -148,6 +148,11 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
       )],
       allowedMentions: { users: [userId] }
     });
+    record.pending = true;
+    record.nextCheckAt = expiresAt;
+    saveActivity(data.active);
+    activitySessions.set(token, { userId, startedAt: record.startedAt, expiresAt });
+    scheduleActivityCheck(userId, ACTIVITY_GRACE_MS);
   }
 
   async function confirmActivityCheck(interaction) {
@@ -180,7 +185,7 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
       try {
         const shift = await otc.getCurrentShift({ discordId: userId, credential: credentials.get(userId) });
         if (shift.state.toio === "out") {
-          data.active[userId] = { startedAt: shift.state.sInDateTime, nextCheckAt: now() + ACTIVITY_INTERVAL_MS, pending: false };
+          data.active[userId] = { startedAt: shift.state.sInDateTime, nextCheckAt: now(), pending: false };
         }
       } catch {
         // A single unavailable or invalid OTC account must not block the other checks.
