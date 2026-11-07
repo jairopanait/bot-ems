@@ -1,20 +1,22 @@
 const { EmbedBuilder, Events } = require("discord.js");
 const { createJsonStore } = require("../../storage");
+const otcLoginImage = require("./otc-login-image");
 
 const OTC_GUIDE_CHANNEL_ID = "1207043891988144208";
 const DISTRIBUTION_GUIDE_CHANNEL_ID = "1568629823960653944";
 const OLD_OTC_GUIDE_MESSAGE_ID = "1568637893893955668";
+const OTC_LOGIN_IMAGE_NAME = "guia-login-otc.jpg";
 
 function register(client, config) {
-  const store = createJsonStore(config.dataDir, "operations-guide-panels.json", { otcMessageId: null, distributionMessageId: null });
+  const store = createJsonStore(config.dataDir, "operations-guide-panels.json", { otcMessageId: null, loginMessageId: null, distributionMessageId: null });
 
-  async function upsert(channel, messageId, embed) {
+  async function upsert(channel, messageId, embed, files = []) {
     const existing = messageId ? await channel.messages.fetch(messageId).catch(() => null) : null;
     if (existing) {
-      await existing.edit({ embeds: [embed], allowedMentions: { parse: [] } });
+      await existing.edit({ embeds: [embed], files, allowedMentions: { parse: [] } });
       return existing.id;
     }
-    const message = await channel.send({ embeds: [embed], allowedMentions: { parse: [] } });
+    const message = await channel.send({ embeds: [embed], files, allowedMentions: { parse: [] } });
     return message.id;
   }
 
@@ -34,6 +36,13 @@ function register(client, config) {
         { name: "📸 Comprobante", value: "Al salir se muestra un resumen privado con Nombre IC, entrada, salida y duración para hacer captura." },
         { name: "⏳ Restar horas", value: "El botón **RESTAR HORAS** abre una solicitud con horas, minutos y razón para su revisión." }
       )
+      .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊" })
+      .setTimestamp();
+    const loginEmbed = new EmbedBuilder()
+      .setColor(0x7b1113)
+      .setTitle("🔐 Consultar tus horas en OTC")
+      .setDescription("𝐒𝐢 𝐪𝐮𝐞𝐫𝐞𝐦𝐨𝐬 𝐯𝐞𝐫 𝐥𝐚𝐬 𝐡𝐨𝐫𝐚𝐬 𝐪𝐮𝐞 𝐭𝐢𝐞𝐧𝐞𝐧 𝐞𝐜𝐡𝐚𝐬 𝐥𝐞 𝐝𝐚𝐧 𝐚 **LOGIN** 𝐲 𝐥𝐨 𝐯𝐞𝐫𝐚𝐧 𝐞𝐧 𝐞𝐬𝐞 𝐚𝐩𝐚𝐫𝐭𝐚𝐝𝐨.")
+      .setImage(`attachment://${OTC_LOGIN_IMAGE_NAME}`)
       .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊" })
       .setTimestamp();
     const distributionEmbed = new EmbedBuilder()
@@ -56,8 +65,9 @@ function register(client, config) {
     }
     const saved = store.read();
     const otcMessageId = await upsert(otcChannel, saved.otcMessageId, otcEmbed);
+    const loginMessageId = await upsert(otcChannel, saved.loginMessageId, loginEmbed, [{ attachment: Buffer.from(otcLoginImage, "base64"), name: OTC_LOGIN_IMAGE_NAME }]);
     const distributionMessageId = await upsert(distributionChannel, saved.distributionMessageId, distributionEmbed);
-    store.write({ otcMessageId, distributionMessageId });
+    store.write({ otcMessageId, loginMessageId, distributionMessageId });
   }
 
   client.once(Events.ClientReady, () => publish().catch((error) => console.error("No se pudieron publicar las guías operativas:", error)));
