@@ -1,4 +1,4 @@
-const { ActionRowBuilder, ComponentType, Events, SlashCommandBuilder, StringSelectMenuBuilder } = require("discord.js");
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, Events, SlashCommandBuilder, StringSelectMenuBuilder } = require("discord.js");
 const { createJsonStore } = require("../../storage");
 
 const commands = [
@@ -93,23 +93,48 @@ function register(client, rootConfig) {
     if (!match) return;
     let response;
     let reason;
+    let privatePanel;
     const context = {
       guild: message.guild,
       user: message.author,
       commandName: match[1].toLowerCase() === "aceptar" ? "aceptarescrita" : "rechazarpostulacion",
       options: { getUser: () => ({ id: match[2] }), getString: () => reason },
       deferReply: async () => {},
-      editReply: async (content) => {
-        if (response) return response.edit({ content, components: [], allowedMentions: { parse: [] } });
-        response = await message.reply({ content, allowedMentions: { parse: [] } });
-        return response;
-      }
+      // Prefix commands leave only the final announcement in the server.
+      editReply: async () => {}
     };
+    async function notifyPrivately(content) {
+      const notice = await message.author.send({ content, allowedMentions: { parse: [] } });
+      const timer = setTimeout(() => notice.delete().catch(() => {}), 15000);
+      timer.unref();
+    }
     try {
+      // Fail before changing roles if the command cannot be removed.
+      await message.delete();
       await requireAnyRole(context, config.writtenCommandRoleIds);
       await target(context);
       if (context.commandName === "rechazarpostulacion") {
-        response = await message.reply({
+        response = await message.channel.send({
+          content: "Abre las opciones de rechazo.",
+          components: [new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`postulations:open:${message.id}`)
+              .setLabel("Elegir motivo").setStyle(ButtonStyle.Primary)
+          )]
+        });
+        const onlyExecutor = (interaction) => {
+          if (interaction.user.id === message.author.id) return true;
+          interaction.reply({ content: "Solo quien ejecutó el comando puede continuar.", ephemeral: true }).catch(() => {});
+          return false;
+        };
+        let opener;
+        try {
+          opener = await response.awaitMessageComponent({ componentType: ComponentType.Button, time: 120000, filter: onlyExecutor });
+        } catch (error) {
+          if (error.code !== "InteractionCollectorError") throw error;
+          return;
+        }
+        await opener.reply({
+          ephemeral: true,
           content: `Selecciona el motivo del rechazo para <@${match[2]}>.`,
           allowedMentions: { parse: [] },
           components: [new ActionRowBuilder().addComponents(
@@ -121,29 +146,36 @@ function register(client, rootConfig) {
               )
           )]
         });
+        privatePanel = opener;
+        const menu = await opener.fetchReply();
+        await response.delete();
+        response = null;
         let selection;
         try {
-          selection = await response.awaitMessageComponent({
+          selection = await menu.awaitMessageComponent({
             componentType: ComponentType.StringSelect,
             time: 120000,
-            filter: (interaction) => {
-              if (interaction.user.id === message.author.id) return true;
-              interaction.reply({ content: "Solo quien ejecutó el comando puede elegir el motivo.", ephemeral: true }).catch(() => {});
-              return false;
-            }
+            filter: onlyExecutor
           });
         } catch (error) {
           if (error.code !== "InteractionCollectorError") throw error;
-          return context.editReply("La selección ha caducado. Ejecuta de nuevo `!rechazar @usuario`.");
+          return;
         }
         reason = selection.values[0];
         await selection.deferUpdate();
+        await opener.deleteReply();
+        privatePanel = null;
       }
       await handle(context);
     } catch (error) {
       console.error("Error en postulaciones:", error);
       const content = error instanceof UserFacingError ? error.message : `${EMS} **Ha fallado el comando. Revisa permisos y jerarquía de roles.**`;
-      await context.editReply(content).catch(() => {});
+      await notifyPrivately(content).catch((notificationError) => {
+        console.error("No se pudo enviar el aviso privado de postulaciones:", notificationError);
+      });
+    } finally {
+      if (privatePanel) await privatePanel.deleteReply().catch(() => {});
+      if (response) await response.delete().catch(() => {});
     }
   });
 
