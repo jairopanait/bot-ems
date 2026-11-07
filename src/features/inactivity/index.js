@@ -2,11 +2,11 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ComponentType,
   EmbedBuilder,
   Events,
   LabelBuilder,
   ModalBuilder,
-  SlashCommandBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
   TextInputBuilder,
@@ -30,11 +30,7 @@ const DATE_DAY_ID = "inactivity:date:day";
 const DATE_CONFIRM_ID = "inactivity:date:confirm";
 const DATE_INDEFINITE_ID = "inactivity:date:indefinite";
 
-const commands = [
-  new SlashCommandBuilder()
-    .setName("inactividades")
-    .setDescription("Muestra las inactividades vigentes")
-];
+const commands = [];
 
 function dateKey(date, timezone) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
@@ -673,6 +669,55 @@ function register(client, rootConfig) {
     cron.schedule("* * * * *", () => processEntries().catch(console.error), { timezone: rootConfig.timezone });
   });
 
+  client.on(Events.MessageCreate, async (message) => {
+    if (!message.inGuild() || message.author.bot || !/^!inactividades\s*$/i.test(message.content.trim())) return;
+    let control;
+    try {
+      await message.delete();
+      const member = await message.guild.members.fetch(message.author.id);
+      if (!member.roles.cache.has(config.viewerRoleId)) {
+        const notice = await message.author.send("No tienes permiso para consultar las inactividades.");
+        const timer = setTimeout(() => notice.delete().catch(() => {}), 15000);
+        timer.unref();
+        return;
+      }
+      control = await message.channel.send({
+        content: "Consulta privada de inactividades.",
+        components: [new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`inactivity:list:${message.id}`)
+            .setLabel("Ver inactividades").setStyle(ButtonStyle.Primary)
+        )]
+      });
+      let interaction;
+      try {
+        interaction = await control.awaitMessageComponent({
+          componentType: ComponentType.Button,
+          time: 120000,
+          filter: (selection) => {
+            if (selection.user.id === message.author.id) return true;
+            selection.reply({ content: "Solo quien ejecutó el comando puede consultar este listado.", ephemeral: true }).catch(() => {});
+            return false;
+          }
+        });
+      } catch (error) {
+        if (error.code !== "InteractionCollectorError") throw error;
+        return;
+      }
+      try {
+        await listEntries(interaction);
+      } catch (error) {
+        console.error("Error al consultar inactividades:", error);
+        const response = { content: "No se pudo consultar el listado de inactividades.", ephemeral: true };
+        if (interaction.replied || interaction.deferred) await interaction.followUp(response).catch(() => {});
+        else await interaction.reply(response).catch(() => {});
+      }
+    } catch (error) {
+      console.error("Error en !inactividades:", error);
+    } finally {
+      if (control) await control.delete().catch(() => {});
+    }
+  });
+
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
       if (interaction.isButton() && interaction.customId === REQUEST_BUTTON_ID) return handleRequest(interaction);
@@ -686,7 +731,6 @@ function register(client, rootConfig) {
       if (interaction.isStringSelectMenu() && interaction.customId === ADMIN_TYPE_SELECT_ID) return handleAdminTypeSelection(interaction);
       if (interaction.isStringSelectMenu() && [DATE_YEAR_ID, DATE_MONTH_ID, DATE_DAY_ID].includes(interaction.customId)) return handleDateComponent(interaction);
       if (interaction.isButton() && [DATE_CONFIRM_ID, DATE_INDEFINITE_ID].includes(interaction.customId)) return handleDateComponent(interaction);
-      if (interaction.isChatInputCommand() && interaction.commandName === "inactividades") return listEntries(interaction);
     } catch (error) {
       console.error("Error en inactividades:", error);
       const response = { content: "No se pudo gestionar la inactividad. Revisa los permisos del bot.", ephemeral: true };
