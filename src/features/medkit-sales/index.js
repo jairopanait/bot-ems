@@ -22,7 +22,7 @@ function register(client, config) {
       const seller = await message.guild.members.fetch(message.author.id);
       if (![...ALLOWED_ROLE_IDS].some((roleId) => seller.roles.cache.has(roleId))) {
         await message.delete();
-        await message.author.send("No tienes permiso para usar `!ventas`.").catch(() => {});
+        await message.author.send("No tienes permiso para usar `!venta`.").catch(() => {});
         return;
       }
       await message.delete();
@@ -72,7 +72,7 @@ function register(client, config) {
       const session = sessions.get(token);
       sessions.delete(token);
       if (!session || session.userId !== submission.user.id || Date.now() >= session.expiresAt) {
-        return submission.reply({ content: "El formulario ha caducado. Ejecuta !ventas de nuevo.", ephemeral: true });
+        return submission.reply({ content: "El formulario ha caducado. Ejecuta !venta de nuevo.", ephemeral: true });
       }
       const buyerId = submission.fields.getTextInputValue("buyer-id").trim();
       const medkitsText = submission.fields.getTextInputValue("medkits").trim();
@@ -104,7 +104,7 @@ function register(client, config) {
       await output.send({ embeds: [embed], allowedMentions: { parse: [] } });
       await submission.editReply("✅ Venta registrada correctamente.");
     } catch (error) {
-      console.error("Error en !ventas:", error);
+      console.error("Error en !venta:", error);
       if (prompt) await prompt.delete().catch(() => {});
       await message.author.send("No se pudo registrar la venta. Inténtalo de nuevo.").catch(() => {});
     }
