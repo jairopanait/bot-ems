@@ -112,7 +112,11 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
     if (!output?.isTextBased() || output.guildId !== config.guildId) throw new OtcError("No se encontró el canal de solicitudes de resta de horas.");
     const hours = interaction.fields.getTextInputValue("hours").trim();
     const minutes = interaction.fields.getTextInputValue("minutes").trim();
-    if (!/^\d{1,3}$/.test(hours) || !/^\d{1,2}$/.test(minutes) || Number(minutes) > 59 || (Number(hours) === 0 && Number(minutes) === 0)) {\n      throw new OtcError("Indica horas y minutos válidos. Los minutos deben estar entre 0 y 59.");\n    }\n    const time = `${Number(hours)} hora(s) y ${Number(minutes)} minuto(s)`;\n    const reason = interaction.fields.getTextInputValue("reason").trim();
+    if (!/^\d{1,3}$/.test(hours) || !/^\d{1,2}$/.test(minutes) || Number(minutes) > 59 || (Number(hours) === 0 && Number(minutes) === 0)) {
+      throw new OtcError("Indica horas y minutos válidos. Los minutos deben estar entre 0 y 59.");
+    }
+    const time = `${Number(hours)} hora(s) y ${Number(minutes)} minuto(s)`;
+    const reason = interaction.fields.getTextInputValue("reason").trim();
     const embed = new EmbedBuilder()
       .setColor(0xe67e22)
       .setTitle("⏳ Solicitud de resta de horas")
