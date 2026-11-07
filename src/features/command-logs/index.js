@@ -1,4 +1,4 @@
-const { EmbedBuilder, Events, escapeMarkdown } = require("discord.js");
+const { EmbedBuilder, Events } = require("discord.js");
 
 const LOG_CHANNEL_ID = "1568442270120808569";
 
@@ -32,7 +32,7 @@ async function sendCommandLog(client, config, { executorId, targetIds, command, 
       const chunks = [];
       let chunk = "";
       for (const role of removedRoles) {
-        const line = `${escapeMarkdown(role.name)} · \`${role.id}\` · <@&${role.id}>`;
+        const line = `<@&${role.id}>`;
         if (chunk && chunk.length + line.length + 1 > 950) {
           chunks.push(chunk);
           chunk = "";
