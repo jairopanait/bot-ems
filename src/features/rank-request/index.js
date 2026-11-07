@@ -2,7 +2,6 @@ const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, EmbedBuilder, Events,
   ModalBuilder, TextInputBuilder, TextInputStyle
 } = require("discord.js");
-const { sendCommandLog } = require("../command-logs");
 
 const OUTPUT_CHANNEL_ID = "1129103844517888131";
 const NOTIFY_ROLE_ID = "1129103460361576589";
@@ -98,13 +97,6 @@ function register(client, config) {
       const rango = submission.fields.getTextInputValue("rank").trim();
       const id = submission.fields.getTextInputValue("id").trim();
       await publishRequest(submission, rango, id);
-      await sendCommandLog(client, config, {
-        executorId: submission.user.id,
-        targetIds: [],
-        command: `!rango · Rango: ${rango}`,
-        createdAt: new Date(),
-        guildId: submission.guildId
-      });
       await submission.editReply("✅ Solicitud de rango enviada correctamente.");
     } catch (error) {
       console.error("Error en !rango:", error);
