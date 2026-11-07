@@ -5,7 +5,7 @@ const {
 const { sendCommandLog } = require("../command-logs");
 
 const OUTPUT_CHANNEL_ID = "1129103844517888131";
-const NOTIFY_ROLE_ID = "1566565732266016819";
+const NOTIFY_ROLE_ID = "1129103460361576589";
 const BUTTON_PREFIX = "rank-request:open:";
 const MODAL_PREFIX = "rank-request:form:";
 
@@ -16,11 +16,14 @@ function register(client, config) {
     const channel = await client.channels.fetch(OUTPUT_CHANNEL_ID).catch(() => null);
     if (!channel?.isTextBased() || channel.guildId !== config.guildId) throw new Error("Canal de solicitudes de rango no válido.");
     const embed = new EmbedBuilder()
-      .setColor(0x3498db)
-      .setTitle("📨 Solicita Rango IC")
+      .setColor(0x5865f2)
+      .setAuthor({ name: "Doctor Salidorro EMS · Solicitudes" })
+      .setTitle("📨 Nueva solicitud de rango IC")
+      .setDescription("Se ha recibido una nueva solicitud para revisar.")
       .addFields(
-        { name: "🎖️ Rango", value: rango },
-        { name: "🆔 ID", value: id }
+        { name: "👤 Persona que lo solicita", value: `<@${interaction.user.id}> · ${interaction.user.tag}`, inline: false },
+        { name: "🎖️ Rango solicitado", value: rango, inline: true },
+        { name: "🆔 ID", value: `\`${id}\``, inline: true }
       )
       .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊" })
       .setTimestamp();
