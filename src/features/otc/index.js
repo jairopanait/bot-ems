@@ -24,10 +24,16 @@ function timeFromOtc(value) {
   return match ? match[1].padStart(5, "0") : "No disponible";
 }
 
-function formatDuration(startedAt, finishedAt) {
-  const start = Date.parse(startedAt);
-  if (!Number.isFinite(start)) return "No disponible";
-  const minutes = Math.max(0, Math.floor((finishedAt.getTime() - start) / 60000));
+function formatDuration(startedAt, finishedAt, timeZone) {
+  // OTC devuelve la entrada sin zona horaria. Calculamos con las horas locales
+  // de OTC para no perder una hora cuando Railway ejecuta el proceso en UTC.
+  const startMatch = timeFromOtc(startedAt).match(/^(\d{2}):(\d{2})$/);
+  const endMatch = formatTime(finishedAt, timeZone).match(/^(\d{2}):(\d{2})$/);
+  if (!startMatch || !endMatch) return "No disponible";
+  const startMinutes = Number(startMatch[1]) * 60 + Number(startMatch[2]);
+  const endMinutes = Number(endMatch[1]) * 60 + Number(endMatch[2]);
+  let minutes = endMinutes - startMinutes;
+  if (minutes < 0) minutes += 24 * 60;
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
@@ -40,7 +46,7 @@ function exitReceipt(result) {
       { name: "👤 Empleado", value: String(result.employeeName || "No disponible"), inline: true },
       { name: "🟢 Entrada", value: timeFromOtc(result.startedAt), inline: true },
       { name: "🔴 Salida", value: exitTime, inline: true },
-      { name: "⏱️ Duración", value: formatDuration(result.startedAt, result.confirmedAt), inline: false }
+      { name: "⏱️ Duración", value: formatDuration(result.startedAt, result.confirmedAt, result.timeZone || "Europe/Madrid"), inline: false }
     )
     .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊" })
     .setTimestamp(result.confirmedAt);
