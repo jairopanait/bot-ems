@@ -4,7 +4,6 @@ const {
   ModalBuilder, TextInputBuilder, TextInputStyle
 } = require("discord.js");
 const { createJsonStore } = require("../../storage");
-const { sendCommandLog } = require("../command-logs");
 const { createOtcClient, OtcError, OtcAuthError, COMPANY_NAME } = require("./client");
 
 const { createCredentialStore } = require("./credentials");
