@@ -91,7 +91,7 @@ function register(client, config) {
       await sendCommandLog(client, config, {
         executorId: submission.user.id,
         targetIds: [],
-        command: `!rango · Rango: ${rango} · ID: ${id}`,
+        command: `!rango · Rango: ${rango}`,
         createdAt: new Date(),
         guildId: submission.guildId
       });
