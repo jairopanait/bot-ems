@@ -14,6 +14,7 @@ const LINES = [
 ];
 
 function register(client, config) {
+  let quietTimer = null;
   const mentions = (members) => members.length ? members.map((member) => `<@${member.id}>`).join(" · ") : "—";
 
   async function publish() {
@@ -41,7 +42,12 @@ function register(client, config) {
 
   client.on(Events.VoiceStateUpdate, (oldState, newState) => {
     if (oldState.guild.id !== config.guildId && newState.guild.id !== config.guildId) return;
-    publish().catch((error) => console.error("No se pudo enviar la distribución:", error));
+    if (quietTimer) clearTimeout(quietTimer);
+    quietTimer = setTimeout(() => {
+      quietTimer = null;
+      publish().catch((error) => console.error("No se pudo enviar la distribución:", error));
+    }, 15000);
+    quietTimer.unref();
   });
 }
 
