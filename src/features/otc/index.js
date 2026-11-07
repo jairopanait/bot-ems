@@ -111,7 +111,7 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
         const shift = await otc.getCurrentShift({ discordId: userId, credential });
         const startedAt = Date.parse(shift.state.sInDateTime);
         const elapsedMs = Date.now() - startedAt;
-        if (Number.isFinite(startedAt) && elapsedMs >= 0 && elapsedMs < 30 * 60 * 1000) {
+        if (!Number.isFinite(startedAt) || elapsedMs < 30 * 60 * 1000) {
           const token = randomUUID();
           sessions.set(token, { userId, action, expiresAt: now() + 300000, shortShiftConfirmation: true });
           return interaction.editReply({
