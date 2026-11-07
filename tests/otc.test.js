@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { Events, ButtonStyle } = require("discord.js");
-const { createOtcClient, OtcError } = require("../src/features/otc/client");
+const { createOtcClient, OtcError, OtcAuthError } = require("../src/features/otc/client");
 const feature = require("../src/features/otc");
 
 const userId = "752666296524734526";
@@ -89,34 +89,92 @@ test("Panel persists, reuses one message, and shows green ENTRADA/red SALIDA", a
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, "otc-panel.json"))), { panelMessageId: "panel" });
 });
 
-test("Private modal binds identity, expires, limits retries, and logs only confirmed punches", async (t) => {
+test("First private form links account; later buttons clock directly with no password", async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ems-otc-modal-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const handlers = {}, calls = [], replies = [], logs = [];
-  let time = 100000, modalId;
-  feature.register({ once: () => {}, on: (e, fn) => { handlers[e] = fn; }, channels: { fetch: async () => ({ guildId: "guild", isTextBased: () => true, send: async (p) => logs.push(p) }) } },
-    { guildId: "guild", dataDir: dir }, { now: () => time, otc: { clock: async (args) => { calls.push(args); return { action: args.action, confirmedAt: new Date() }; } } });
-  const base = { inGuild: () => true, guildId: "guild", channelId: "1568448649833480360", user: { id: userId }, reply: async (p) => replies.push(p), isButton: () => false, isModalSubmit: () => false };
-  const button = { ...base, isButton: () => true, customId: "otc:in", showModal: async (m) => { modalId = m.toJSON().custom_id; } };
-  const submit = () => ({ ...base, isModalSubmit: () => true, customId: modalId, fields: { getTextInputValue: () => "private-fixture" }, deferReply: async (p) => { assert.equal(p.ephemeral, true); }, editReply: async (p) => replies.push(p) });
+  let time = 100000, modalId, modalCount = 0, valid = true;
+  const credential = "a".repeat(32);
+  const config = { guildId: "guild", dataDir: dir };
+  const client = { once: () => {}, on: (e, fn) => { handlers[e] = fn; }, channels: { fetch: async () => ({ guildId: "guild", isTextBased: () => true, send: async (p) => logs.push(p) }) } };
+  const otc = {
+    authenticate: async ({ password }) => { assert.equal(password, "private-fixture"); return { credential }; },
+    clock: async (args) => { if (!valid) throw new OtcAuthError("Contraseña cambiada"); calls.push(args); return { action: args.action, confirmedAt: new Date() }; }
+  };
+  feature.register(client, config, { now: () => time, otc });
+  const base = { inGuild: () => true, guildId: "guild", channelId: "1568448649833480360", user: { id: userId }, reply: async (p) => replies.push(p), isButton: () => false, isModalSubmit: () => false,
+    deferReply: async (p) => { assert.equal(p.ephemeral, true); }, editReply: async (p) => replies.push(p) };
+  const button = { ...base, isButton: () => true, customId: "otc:in", showModal: async (m) => { modalCount++; modalId = m.toJSON().custom_id; } };
+  const submit = () => ({ ...base, isModalSubmit: () => true, customId: modalId, fields: { getTextInputValue: () => "private-fixture" } });
   await handlers[Events.InteractionCreate](button);
   await handlers[Events.InteractionCreate]({ ...submit(), user: { id: "other" } });
   assert.equal(calls.length, 0);
   await handlers[Events.InteractionCreate](submit());
-  assert.equal(calls.length, 1);
-  assert.deepEqual(calls[0], { discordId: userId, password: "private-fixture", action: "in" });
+  assert.deepEqual(calls[0], { discordId: userId, credential, action: "in" });
   assert.equal(logs.length, 1);
   assert(!JSON.stringify(logs).includes("private-fixture"));
   await handlers[Events.InteractionCreate](submit());
-  assert.equal(calls.length, 1); // One-time token.
+  assert.equal(calls.length, 1); // Single use.
   await handlers[Events.InteractionCreate](button);
-  await handlers[Events.InteractionCreate](submit());
   assert.equal(calls.length, 1); // Cooldown.
   time += 31000;
+  feature.register(client, config, { now: () => time, otc }); // Restart with persisted credentials.
+  await handlers[Events.InteractionCreate]({ ...button, customId: "otc:out" });
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].action, "out");
+  assert.equal(modalCount, 1);
+  time += 31000;
+  valid = false;
   await handlers[Events.InteractionCreate](button);
+  assert.equal(logs.length, 2); // Invalid saved credential never produces success log.
+  const renewalId = replies.at(-1).components[0].toJSON().components[0].custom_id;
+  assert.equal(renewalId, "otc:renew:in");
+  await handlers[Events.InteractionCreate]({ ...button, customId: renewalId });
+  assert.equal(modalCount, 2);
   time += 300001;
   await handlers[Events.InteractionCreate](submit());
-  assert.equal(calls.length, 1); // Expired modal.
-  await handlers[Events.InteractionCreate]({ ...button, channelId: "wrong" });
-  assert.equal(calls.length, 1);
+  assert.match(replies.at(-1).content, /caducado/);
+  assert.equal(calls.length, 2);
+});
+
+const { createCredentialStore } = require("../src/features/otc/credentials");
+test("Credential is encrypted at rest, survives restart, and rejects tampering/user swaps", (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ems-otc-vault-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const store = createCredentialStore(dir, "guild");
+  assert.equal(store.get(userId), null);
+  const credential = "a".repeat(32);
+  store.set(userId, credential);
+  const vaultFile = path.join(dir, "otc-private", "credentials.json");
+  assert(!fs.readFileSync(vaultFile, "utf8").includes(credential));
+  assert.equal(fs.statSync(vaultFile).mode & 0o777, 0o600);
+  assert.equal(fs.statSync(path.join(dir, "otc-private", "master.key")).mode & 0o777, 0o600);
+  assert.equal(createCredentialStore(dir, "guild").get(userId), credential);
+  store.set(userId, "b".repeat(32));
+  assert.equal(store.get(userId), "b".repeat(32));
+  const records = JSON.parse(fs.readFileSync(vaultFile));
+  records["guild:other"] = records[`guild:${userId}`];
+  fs.writeFileSync(vaultFile, JSON.stringify(records));
+  assert.throws(() => store.get("other"), /descifrar/);
+  records[`guild:${userId}`].data = Buffer.from("corrupted").toString("base64");
+  fs.writeFileSync(vaultFile, JSON.stringify(records));
+  assert.throws(() => store.get(userId), /descifrar/);
+  fs.unlinkSync(path.join(dir, "otc-private", "master.key"));
+  assert.throws(() => store.set(userId, credential), /clave/); // Never replace a lost master key silently.
+});
+
+test("Incorrect first password is not persisted and never clocks", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ems-otc-invalid-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const handlers = {}, replies = [];
+  let modalId;
+  feature.register({ once: () => {}, on: (event, fn) => { handlers[event] = fn; } }, { guildId: "guild", dataDir: dir }, {
+    otc: { authenticate: async () => { throw new OtcAuthError("Contraseña incorrecta"); }, clock: async () => assert.fail("Must not clock") }
+  });
+  const base = { inGuild: () => true, guildId: "guild", channelId: "1568448649833480360", user: { id: userId }, isButton: () => false, isModalSubmit: () => false };
+  await handlers[Events.InteractionCreate]({ ...base, isButton: () => true, customId: "otc:in", showModal: async (m) => { modalId = m.toJSON().custom_id; } });
+  await handlers[Events.InteractionCreate]({ ...base, isModalSubmit: () => true, customId: modalId, fields: { getTextInputValue: () => "incorrect" }, deferReply: async () => {}, editReply: async (p) => replies.push(p) });
+  assert.match(replies[0].content, /incorrecta/);
+  assert.equal(createCredentialStore(dir, "guild").get(userId), null);
+  assert(!fs.existsSync(path.join(dir, "otc-private", "master.key")));
 });

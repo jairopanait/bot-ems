@@ -5,6 +5,7 @@ const COMPANY_NAME = "EMS-LANARANJARP";
 const ENDPOINT = "https://api1.opentimeclock.com/T1-TimeClockFree";
 
 class OtcError extends Error {}
+class OtcAuthError extends OtcError {}
 
 // These requests mirror the public T1 web client. Never log request/response bodies:
 // authentication responses can include credentials and other employee data.
@@ -28,19 +29,26 @@ function createOtcClient({ fetchImpl = globalThis.fetch } = {}) {
     }
   }
 
-  async function clock({ discordId, password, action }) {
-    if (!/^[0-9]{17,20}$/.test(discordId) || !["in", "out"].includes(action)) throw new OtcError("Solicitud de fichaje no válida.");
-    if (typeof password !== "string" || !password.trim()) throw new OtcError("Introduce tu contraseña de OTC.");
-    const md5Password = createHash("md5").update(password.trim()).digest("hex");
+  async function authenticate({ discordId, password, credential }) {
+    if (!/^[0-9]{17,20}$/.test(discordId)) throw new OtcError("Solicitud de fichaje no válida.");
+    if (!credential && (typeof password !== "string" || !password.trim())) throw new OtcAuthError("Introduce tu contraseña de OTC.");
+    const md5Password = credential || createHash("md5").update(password.trim()).digest("hex");
+    if (!/^[a-f0-9]{32}$/.test(md5Password)) throw new OtcAuthError("Vuelve a introducir tu contraseña de OTC.");
     password = null;
     const users = await request("web/sGetOneUserInfo", {
       action: "checkPassword", userName: discordId, md5Password
     });
     if (!Array.isArray(users) || users.length !== 1 || String(users[0].UserName) !== discordId || !users[0].UserId) {
-      throw new OtcError("No se ha podido validar tu cuenta. Usa tu contraseña de OTC y comprueba que tu usuario allí sea tu ID de Discord.");
+      throw new OtcAuthError("No se ha podido validar tu cuenta. Usa tu contraseña de OTC y comprueba que tu usuario allí sea tu ID de Discord.");
     }
     const user = users[0];
     if (Number(user.Archived || 0) !== 0) throw new OtcError("Tu cuenta de OTC está archivada.");
+    return { user, credential: md5Password };
+  }
+
+  async function clock({ discordId, password, credential, action }) {
+    if (!["in", "out"].includes(action)) throw new OtcError("Solicitud de fichaje no válida.");
+    const { user } = await authenticate({ discordId, password, credential });
     const companies = await request("web/sGetCompanyById");
     const company = Array.isArray(companies) && companies.length === 1 ? companies[0] : null;
     if (!company || String(company.CompanyId) !== String(COMPANY_ID) || company.CompanyName !== COMPANY_NAME) {
@@ -82,7 +90,7 @@ function createOtcClient({ fetchImpl = globalThis.fetch } = {}) {
     if (result !== "SUCCESS") throw new OtcError("OTC no ha confirmado el fichaje. Revisa tu estado en su web antes de volver a intentarlo.");
     return { action, confirmedAt: new Date() };
   }
-  return { clock };
+  return { clock, authenticate };
 }
 
-module.exports = { createOtcClient, OtcError, COMPANY_NAME };
+module.exports = { createOtcClient, OtcError, OtcAuthError, COMPANY_NAME };
