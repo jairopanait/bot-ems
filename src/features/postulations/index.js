@@ -216,9 +216,13 @@ function register(client, rootConfig) {
     } catch (error) {
       console.error("Error en postulaciones:", error);
       const content = error instanceof UserFacingError ? error.message : `${EMS} **Ha fallado el comando. Revisa permisos y jerarquía de roles.**`;
-      await notifyPrivately(content).catch((notificationError) => {
-        console.error("No se pudo enviar el aviso privado de postulaciones:", notificationError);
-      });
+      if (instructionModal?.deferred || instructionModal?.replied) {
+        await instructionModal.editReply({ content }).catch(() => {});
+      } else {
+        await notifyPrivately(content).catch((notificationError) => {
+          console.error("No se pudo enviar el aviso privado de postulaciones:", notificationError);
+        });
+      }
     } finally {
       if (privatePanel) await privatePanel.deleteReply().catch(() => {});
       if (response) await response.delete().catch(() => {});
