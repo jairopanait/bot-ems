@@ -9,9 +9,11 @@ const { createOtcClient, OtcError, OtcAuthError, COMPANY_NAME } = require("./cli
 const { createCredentialStore } = require("./credentials");
 
 const PANEL_CHANNEL_ID = "1568448649833480360";
-const BUTTON_ACTIONS = { "otc:in": "in", "otc:out": "out" };
+const BUTTON_ACTIONS = { "otc:in": "in", "otc:out": "out", "otc:subtract": "subtract" };
 const MODAL_PREFIX = "otc:password:";
 const CONFIRM_OUT_PREFIX = "otc:confirm-out:";
+const SUBTRACT_MODAL_PREFIX = "otc:subtract:";
+const HOURS_DEDUCTION_CHANNEL_ID = "1129103832346017842";
 
 function formatTime(date, timeZone) {
   return new Intl.DateTimeFormat("es-ES", { timeZone, hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
@@ -59,7 +61,8 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
         .setColor(0x1f2240)],
       components: [new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId("otc:in").setLabel("ENTRADA").setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId("otc:out").setLabel("SALIDA").setStyle(ButtonStyle.Danger)
+        new ButtonBuilder().setCustomId("otc:out").setLabel("SALIDA").setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId("otc:subtract").setLabel("RESTAR HORAS").setStyle(ButtonStyle.Secondary)
       )], allowedMentions: { parse: [] }
     };
     const data = store.read();
@@ -74,6 +77,52 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
   client.once(Events.ClientReady, () => {
     publishPanel().catch(() => console.error("No se pudo publicar el panel de fichaje OTC."));
   });
+  async function openHoursDeductionForm(interaction) {
+    for (const [key, session] of sessions) if (now() >= session.expiresAt) sessions.delete(key);
+    const token = randomUUID();
+    const modal = new ModalBuilder().setCustomId(`${SUBTRACT_MODAL_PREFIX}${token}`)
+      .setTitle("Solicitar resta de horas")
+      .addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder().setCustomId("time").setLabel("Tiempo a restar")
+            .setPlaceholder("Ejemplo: 30 minutos o 1 hora").setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80)
+        ),
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder().setCustomId("reason").setLabel("Razón")
+            .setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000)
+        )
+      );
+    sessions.set(token, { userId: interaction.user.id, kind: "subtract", expiresAt: now() + 300000 });
+    try { await interaction.showModal(modal); }
+    catch (error) { sessions.delete(token); throw error; }
+  }
+
+  async function submitHoursDeduction(interaction, session) {
+    await interaction.deferReply({ ephemeral: true });
+    const credential = credentials.get(interaction.user.id);
+    if (!credential) throw new OtcAuthError("Primero vincula tu cuenta OTC usando ENTRADA o SALIDA.");
+    const authenticated = await otc.authenticate({ discordId: interaction.user.id, credential });
+    const user = authenticated.user;
+    const nameIc = user.FullName || [user.FirstName, user.LastName].filter(Boolean).join(" ") || user.Name || user.UserName || interaction.user.username;
+    const output = await client.channels.fetch(HOURS_DEDUCTION_CHANNEL_ID).catch(() => null);
+    if (!output?.isTextBased() || output.guildId !== config.guildId) throw new OtcError("No se encontró el canal de solicitudes de resta de horas.");
+    const time = interaction.fields.getTextInputValue("time").trim();
+    const reason = interaction.fields.getTextInputValue("reason").trim();
+    const embed = new EmbedBuilder()
+      .setColor(0xe67e22)
+      .setTitle("⏳ Solicitud de resta de horas")
+      .addFields(
+        { name: "👤 Nombre IC", value: nameIc },
+        { name: "🆔 Discord ID", value: `\`${interaction.user.id}\`` },
+        { name: "⏱️ Tiempo", value: time },
+        { name: "📝 Razón", value: reason }
+      )
+      .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊" })
+      .setTimestamp();
+    await output.send({ embeds: [embed], allowedMentions: { parse: [] } });
+    await interaction.editReply("✅ Tu solicitud de resta de horas ha sido enviada.");
+  }
+
   async function openPasswordForm(interaction, action) {
     for (const [key, session] of sessions) if (now() >= session.expiresAt) sessions.delete(key);
     for (const [userId, attempt] of lastAttempt) if (now() - attempt.at >= 30000 && !inFlight.has(userId)) lastAttempt.delete(userId);
@@ -144,10 +193,21 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
     const renewal = interaction.isButton() && /^otc:renew:(in|out)$/.test(interaction.customId);
     const shortShiftConfirmation = interaction.isButton() && interaction.customId.startsWith(CONFIRM_OUT_PREFIX);
     const isModal = interaction.isModalSubmit() && interaction.customId.startsWith(MODAL_PREFIX);
-    if (!action && !renewal && !shortShiftConfirmation && !isModal) return;
+    const isSubtractModal = interaction.isModalSubmit() && interaction.customId.startsWith(SUBTRACT_MODAL_PREFIX);
+    if (!action && !renewal && !shortShiftConfirmation && !isModal && !isSubtractModal) return;
     if (!interaction.inGuild() || interaction.guildId !== config.guildId || interaction.channelId !== PANEL_CHANNEL_ID) return;
     try {
       if (renewal) return await openPasswordForm(interaction, interaction.customId.split(":")[2]);
+      if (action === "subtract") return await openHoursDeductionForm(interaction);
+      if (isSubtractModal) {
+        const token = interaction.customId.slice(SUBTRACT_MODAL_PREFIX.length);
+        const session = sessions.get(token);
+        if (!session || session.kind !== "subtract" || session.userId !== interaction.user.id || now() >= session.expiresAt) {
+          return await interaction.reply({ content: "El formulario ha caducado. Pulsa RESTAR HORAS de nuevo.", ephemeral: true });
+        }
+        sessions.delete(token);
+        return await submitHoursDeduction(interaction, session);
+      }
       if (shortShiftConfirmation) {
         const token = interaction.customId.slice(CONFIRM_OUT_PREFIX.length);
         const session = sessions.get(token);
