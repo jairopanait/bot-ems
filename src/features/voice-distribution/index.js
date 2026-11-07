@@ -24,30 +24,38 @@ function register(client, config) {
     await guild.members.fetch().catch(() => {});
     const h50Members = [...guild.members.cache.values()].filter((member) => !member.user.bot && member.roles.cache.has(H50_ROLE_ID));
     const lines = [
-      `🧑🏼‍⚕️ **H-50:** ${mentions(h50Members)}`,
+      `**🧑🏼‍⚕️ H-50: ${mentions(h50Members)}**`,
       ...LINES.map(({ label, channelId }) => {
         const channel = guild.channels.cache.get(channelId);
         const members = channel?.isVoiceBased() ? [...channel.members.values()].filter((member) => !member.user.bot) : [];
-        return `${label}: ${mentions(members)}`;
+        return `**${label}: ${mentions(members)}**`;
       })
     ];
     const embed = new EmbedBuilder()
       .setColor(0x2ecc71)
-      .setTitle("📋 Distribución obligatoria")
-      .setDescription(lines.join("\n\n"))
+      .setTitle("Doctor Salidorro EMS")
+      .setDescription(`# **📋 DISTRIBUCIÓN OBLIGATORIA**\n\n${lines.join("\n\n")}`)
       .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊 · Actualización automática" })
       .setTimestamp();
     await panelChannel.send({ embeds: [embed], allowedMentions: { parse: [] } });
   }
 
-  client.on(Events.VoiceStateUpdate, (oldState, newState) => {
-    if (oldState.guild.id !== config.guildId && newState.guild.id !== config.guildId) return;
+  function schedulePublish() {
     if (quietTimer) clearTimeout(quietTimer);
     quietTimer = setTimeout(() => {
       quietTimer = null;
       publish().catch((error) => console.error("No se pudo enviar la distribución:", error));
     }, 15000);
     quietTimer.unref();
+  }
+
+  client.on(Events.VoiceStateUpdate, (oldState, newState) => {
+    if (oldState.guild.id !== config.guildId && newState.guild.id !== config.guildId) return;
+    schedulePublish();
+  });
+  client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
+    if (newMember.guild.id !== config.guildId) return;
+    if (oldMember.roles.cache.has(H50_ROLE_ID) !== newMember.roles.cache.has(H50_ROLE_ID)) schedulePublish();
   });
 }
 
