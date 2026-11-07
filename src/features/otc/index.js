@@ -76,7 +76,7 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
   });
   async function openPasswordForm(interaction, action) {
     for (const [key, session] of sessions) if (now() >= session.expiresAt) sessions.delete(key);
-    for (const [userId, attemptedAt] of lastAttempt) if (now() - attemptedAt >= 30000 && !inFlight.has(userId)) lastAttempt.delete(userId);
+    for (const [userId, attempt] of lastAttempt) if (now() - attempt.at >= 30000 && !inFlight.has(userId)) lastAttempt.delete(userId);
     const token = randomUUID();
     const modal = new ModalBuilder().setCustomId(`${MODAL_PREFIX}${token}`)
       .setTitle(action === "in" ? "Vincular OTC · ENTRADA" : "Vincular OTC · SALIDA")
@@ -91,11 +91,11 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
 
   async function execute(interaction, action, password, skipShortShiftConfirmation = false) {
     const userId = interaction.user.id;
-    if (inFlight.has(userId) || now() - (lastAttempt.get(userId) ?? -Infinity) < 30000) {
+    const previousAttempt = lastAttempt.get(userId);
+    if (inFlight.has(userId) || (previousAttempt && previousAttempt.action === action && now() - previousAttempt.at < 30000)) {
       return interaction.reply({ content: "Espera 30 segundos y comprueba tu estado en OTC antes de volver a fichar.", ephemeral: true });
     }
     inFlight.add(userId);
-    lastAttempt.set(userId, now());
     try {
       await interaction.deferReply({ ephemeral: true });
       let credential;
@@ -123,6 +123,7 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
           });
         }
       }
+      lastAttempt.set(userId, { action, at: now() });
       const result = await otc.clock({ discordId: userId, credential, action });
       const payload = result.action === "out"
         ? { content: "", embeds: [exitReceipt(result)], components: [], allowedMentions: { parse: [] } }
