@@ -1,4 +1,4 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, Events, StringSelectMenuBuilder } = require("discord.js");
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, Events, ModalBuilder, StringSelectMenuBuilder, TextInputBuilder, TextInputStyle } = require("discord.js");
 const { createJsonStore } = require("../../storage");
 
 const commands = [];
@@ -47,6 +47,15 @@ function register(client, rootConfig) {
     await channel.send({ content, allowedMentions: { parse: ["users"], roles: [config.emsMentionRoleId] } });
   }
 
+  async function publishInstructionTemplate(nameIc, member) {
+    const channel = await client.channels.fetch(config.instructionTemplateChannelId).catch(() => null);
+    if (!channel?.isTextBased()) throw new UserFacingError(`${EMS} **No encuentro el canal de plantillas de instrucción configurado.**`);
+    await channel.send({
+      content: `Nombre Ic: ${nameIc}\nDiscord Id: ${member.id}`,
+      allowedMentions: { parse: [] }
+    });
+  }
+
   async function handle(interaction) {
     await interaction.deferReply({ ephemeral: true });
     const command = interaction.commandName;
@@ -87,6 +96,7 @@ function register(client, rootConfig) {
     let response;
     let reason;
     let privatePanel;
+    let instructionModal;
     const context = {
       guild: message.guild,
       user: message.author,
@@ -158,6 +168,49 @@ function register(client, rootConfig) {
         await selection.deferUpdate();
         await opener.deleteReply();
         privatePanel = null;
+      }
+      if (context.commandName === "instruccionaprobada") {
+        response = await message.channel.send({
+          content: "Abre la plantilla obligatoria de instrucción.",
+          components: [new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`postulations:instruction:${message.id}`)
+              .setLabel("Rellenar plantilla").setStyle(ButtonStyle.Primary)
+          )]
+        });
+        const onlyExecutor = (interaction) => {
+          if (interaction.user.id === message.author.id) return true;
+          interaction.reply({ content: "Solo quien ejecutó el comando puede continuar.", ephemeral: true }).catch(() => {});
+          return false;
+        };
+        let opener;
+        try {
+          opener = await response.awaitMessageComponent({ componentType: ComponentType.Button, time: 120000, filter: onlyExecutor });
+        } catch (error) {
+          if (error.code !== "InteractionCollectorError") throw error;
+          return;
+        }
+        const modal = new ModalBuilder().setCustomId(`postulations:instruction-form:${message.id}`)
+          .setTitle("Plantilla de instrucción")
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId("name-ic").setLabel("Nombre IC")
+              .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100)
+          ));
+        await opener.showModal(modal);
+        await response.delete().catch(() => {});
+        response = null;
+        try {
+          instructionModal = await opener.awaitModalSubmit({ time: 300000, filter: onlyExecutor });
+        } catch (error) {
+          if (error.code !== "InteractionCollectorError") throw error;
+          return;
+        }
+        const nameIc = instructionModal.fields.getTextInputValue("name-ic").trim();
+        await instructionModal.deferReply({ ephemeral: true });
+        const member = await target(context);
+        await publishInstructionTemplate(nameIc, member);
+        await handle(context);
+        await instructionModal.editReply(`${HEART} **Plantilla registrada e instrucción aprobada** para ${member}.`);
+        return;
       }
       await handle(context);
     } catch (error) {
