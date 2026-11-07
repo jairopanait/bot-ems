@@ -12,11 +12,8 @@ function register(client, config) {
     const embed = new EmbedBuilder()
       .setColor(0x7b1113)
       .setTitle("📖 Comandos por rango")
-      .setDescription("Aquí tienes los comandos disponibles para roles distintos de Directiva o compartidos con otros rangos.")
+      .setDescription("Aquí tienes los comandos disponibles para los rangos autorizados.")
       .addFields(
-        { name: "📝 !aceptar @usuario · !rechazar @usuario", value: "Gestionan postulaciones escritas.\nPuede usarlos: <@&1135516317097660538> · <@&1129103460361576589>" },
-        { name: "🩸 !instruccion @usuario", value: "Envía la plantilla al usuario, registra su Nombre IC, cambia su apodo y aprueba la instrucción.\nPuede usarlo: <@&1129103424311541790>" },
-        { name: "📤 !renuncia @usuario", value: "Gestiona la salida de un miembro, roles y plantilla de renuncia.\nPuede usarlo: <@&1135516317097660538> · <@&1483489497705611408>" },
         { name: "🎖️ !rango", value: "Abre una solicitud de Rango IC e ID.\nPuede usarlo: <@&1129103467294769214>" },
         { name: "💊 !venta", value: "Registra la venta de medkits y calcula el reparto Hospital/EMS.\nPuede usarlo: <@&1129103355126481006> · <@&1129103352488271983> · <@&1129103349594202253> · <@&1129103346872107139> · <@&1129573501209165965> · <@&1129103343709585468> · <@&1129103338793877565> · <@&1129103341520158750> · <@&1135516317097660538>" }
       )
