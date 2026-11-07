@@ -76,11 +76,6 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
       } else credential = credentials.get(userId);
       if (!credential) throw new OtcAuthError("Introduce tu contraseña de OTC para vincular tu cuenta.");
       const result = await otc.clock({ discordId: userId, credential, action });
-      await sendCommandLog(client, config, {
-        executorId: userId, targetIds: [userId],
-        command: `OTC ${result.action === "in" ? "ENTRADA" : "SALIDA"} (confirmada)`,
-        guildId: config.guildId, createdAt: result.confirmedAt
-      });
       await interaction.editReply({ content: `✅ ${result.action === "in" ? "ENTRADA" : "SALIDA"} registrada en OpenTimeClock.`, components: [], allowedMentions: { parse: [] } });
     } catch (error) {
       if (!(error instanceof OtcAuthError)) throw error;
