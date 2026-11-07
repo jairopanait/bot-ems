@@ -11,6 +11,7 @@ const { createCredentialStore } = require("./credentials");
 const PANEL_CHANNEL_ID = "1568448649833480360";
 const BUTTON_ACTIONS = { "otc:in": "in", "otc:out": "out" };
 const MODAL_PREFIX = "otc:password:";
+const CONFIRM_OUT_PREFIX = "otc:confirm-out:";
 
 function formatTime(date, timeZone) {
   return new Intl.DateTimeFormat("es-ES", { timeZone, hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
@@ -88,7 +89,7 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
     catch (error) { sessions.delete(token); throw error; }
   }
 
-  async function execute(interaction, action, password) {
+  async function execute(interaction, action, password, skipShortShiftConfirmation = false) {
     const userId = interaction.user.id;
     if (inFlight.has(userId) || now() - (lastAttempt.get(userId) ?? -Infinity) < 30000) {
       return interaction.reply({ content: "Espera 30 segundos y comprueba tu estado en OTC antes de volver a fichar.", ephemeral: true });
@@ -106,6 +107,22 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
         password = null;
       } else credential = credentials.get(userId);
       if (!credential) throw new OtcAuthError("Introduce tu contraseña de OTC para vincular tu cuenta.");
+      if (action === "out" && !skipShortShiftConfirmation) {
+        const shift = await otc.getCurrentShift({ discordId: userId, credential });
+        const startedAt = Date.parse(shift.state.sInDateTime);
+        const elapsedMs = Date.now() - startedAt;
+        if (Number.isFinite(startedAt) && elapsedMs >= 0 && elapsedMs < 30 * 60 * 1000) {
+          const token = randomUUID();
+          sessions.set(token, { userId, action, expiresAt: now() + 300000, shortShiftConfirmation: true });
+          return interaction.editReply({
+            content: "⚠️ **¿Seguro que quieres finalizar el fichaje?** No has llegado a los **30 minutos mínimos de servicio**.",
+            components: [new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setCustomId(`${CONFIRM_OUT_PREFIX}${token}`).setLabel("Sí, finalizar fichaje").setStyle(ButtonStyle.Danger)
+            )],
+            allowedMentions: { parse: [] }
+          });
+        }
+      }
       const result = await otc.clock({ discordId: userId, credential, action });
       const payload = result.action === "out"
         ? { content: "", embeds: [exitReceipt(result)], components: [], allowedMentions: { parse: [] } }
@@ -124,11 +141,21 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
   client.on(Events.InteractionCreate, async (interaction) => {
     const action = interaction.isButton() ? BUTTON_ACTIONS[interaction.customId] : null;
     const renewal = interaction.isButton() && /^otc:renew:(in|out)$/.test(interaction.customId);
+    const shortShiftConfirmation = interaction.isButton() && interaction.customId.startsWith(CONFIRM_OUT_PREFIX);
     const isModal = interaction.isModalSubmit() && interaction.customId.startsWith(MODAL_PREFIX);
-    if (!action && !renewal && !isModal) return;
+    if (!action && !renewal && !shortShiftConfirmation && !isModal) return;
     if (!interaction.inGuild() || interaction.guildId !== config.guildId || interaction.channelId !== PANEL_CHANNEL_ID) return;
     try {
       if (renewal) return await openPasswordForm(interaction, interaction.customId.split(":")[2]);
+      if (shortShiftConfirmation) {
+        const token = interaction.customId.slice(CONFIRM_OUT_PREFIX.length);
+        const session = sessions.get(token);
+        if (!session || !session.shortShiftConfirmation || session.userId !== interaction.user.id || now() >= session.expiresAt) {
+          return await interaction.reply({ content: "La confirmación ha caducado. Pulsa SALIDA de nuevo.", ephemeral: true });
+        }
+        sessions.delete(token);
+        return await execute(interaction, "out", undefined, true);
+      }
       if (action) {
         if (!credentials.get(interaction.user.id)) return await openPasswordForm(interaction, action);
         return await execute(interaction, action);
