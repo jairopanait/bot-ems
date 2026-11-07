@@ -50,7 +50,10 @@ function register(client, config) {
       .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊" })
       .setTimestamp();
     const oldChannel = await client.channels.fetch(DISTRIBUTION_GUIDE_CHANNEL_ID).catch(() => null);
-    await oldChannel?.messages.fetch(OLD_OTC_GUIDE_MESSAGE_ID).then((message) => message.delete()).catch(() => {});
+    if (oldChannel?.isTextBased()) {
+      const oldMessage = await oldChannel.messages.fetch(OLD_OTC_GUIDE_MESSAGE_ID).catch(() => null);
+      if (oldMessage) await oldMessage.delete().catch(() => {});
+    }
     const saved = store.read();
     const otcMessageId = await upsert(otcChannel, saved.otcMessageId, otcEmbed);
     const distributionMessageId = await upsert(distributionChannel, saved.distributionMessageId, distributionEmbed);
