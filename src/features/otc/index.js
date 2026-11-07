@@ -115,7 +115,7 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
           const token = randomUUID();
           sessions.set(token, { userId, action, expiresAt: now() + 300000, shortShiftConfirmation: true });
           return interaction.editReply({
-            content: "⚠️ **¿Seguro que quieres finalizar el fichaje?** No has llegado a los **30 minutos mínimos de servicio**.",
+            content: "⚠️ **¿Seguro que quieres finalizar el fichaje?** Llevas menos de **30 minutos de servicio**.",
             components: [new ActionRowBuilder().addComponents(
               new ButtonBuilder().setCustomId(`${CONFIRM_OUT_PREFIX}${token}`).setLabel("Sí, finalizar fichaje").setStyle(ButtonStyle.Danger)
             )],
