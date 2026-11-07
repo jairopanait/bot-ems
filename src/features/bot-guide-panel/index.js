@@ -27,6 +27,8 @@ function register(client, config) {
         { name: "📢 Avisos y roles", value: "**Canal de avisos:** al mencionar usuario y rol de aviso añade el rol y el rol común. Si el aviso dice `apelado`, retira los avisos mencionados. El rol común se retira al no quedar ningún aviso activo." },
         { name: "🔊 Distribución de voz", value: "**Distribución obligatoria.** Tras 15 segundos sin movimientos, publica quién está en cada canal de voz y los H-50. También actualiza al añadir o retirar el rol H-50. Si todos los canales vigilados quedan vacíos, menciona a <@&1129103467294769214> con **CIUDAD SOLA**. No guarda registros." },
         { name: "⚖️ Gestión de facción", value: "**Canal de salidas/expulsiones:** permite elegir descenso o expulsión, por horas o por conducta; aplica roles de expulsión y blacklist cuando corresponde." }
+,
+        { name: "🧾 Registro de uso y logs", value: "**Canal de logs:** <#1568442270120808569>.\n**Sí registra:** `!aceptar`, `!rechazar`, `!instruccion`, `!renuncia`, `!inactividades` y `!rango`. En renuncias también registra los roles realmente retirados.\n**No registra:** `!venta`, el panel OTC, restar horas, paneles de inactividad, H-50, cuestionario EMS, distribución de voz, avisos automáticos y gestión automática de facción." }
       )
       .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊 · Guía automática" })
       .setTimestamp();
