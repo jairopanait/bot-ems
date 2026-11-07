@@ -18,6 +18,7 @@ const ACTIVITY_CHECK_PREFIX = "otc:active:";
 const ACTIVITY_INTERVAL_MS = 60 * 60 * 1000;
 const ACTIVITY_GRACE_MS = 5 * 60 * 1000;
 const ACTIVITY_RETRY_MS = 60 * 1000;
+const ACTIVITY_LOG_CHANNEL_ID = "1568442270120808569";
 
 function formatTime(date, timeZone) {
   return new Intl.DateTimeFormat("es-ES", { timeZone, hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
@@ -113,21 +114,47 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
     if (member?.voice?.channelId) await member.voice.disconnect("Fichaje cerrado por falta de confirmación").catch(() => {});
   }
 
+  async function deleteActivityMessage(record) {
+    if (!record?.activityChannelId || !record?.activityMessageId) return;
+    const channel = await client.channels.fetch(record.activityChannelId).catch(() => null);
+    if (!channel?.isTextBased()) return;
+    const message = await channel.messages.fetch(record.activityMessageId).catch(() => null);
+    if (message) await message.delete().catch(() => {});
+  }
+
+  async function sendActivityLog(userId, confirmed) {
+    const channel = await client.channels.fetch(ACTIVITY_LOG_CHANNEL_ID).catch(() => null);
+    if (!channel?.isTextBased() || channel.guildId !== config.guildId) return;
+    const embed = new EmbedBuilder()
+      .setColor(0x7b1113)
+      .setTitle("🛡️ Verificación de fichaje OTC")
+      .setDescription(confirmed
+        ? `<@${userId}> confirmó que **sigue de servicio**.`
+        : `<@${userId}> **no confirmó** que seguía de servicio; su fichaje fue cerrado.`)
+      .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊" })
+      .setTimestamp();
+    await channel.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => {});
+  }
+
   async function closeForNoActivity(userId, expectedStartedAt) {
     const data = activityData();
     const record = data.active[userId];
     if (!record || record.startedAt !== expectedStartedAt) return;
     const credential = credentials.get(userId);
-    if (!credential) return removeActivityCheck(userId);
+    if (!credential) {
+      await deleteActivityMessage(record);
+      return removeActivityCheck(userId);
+    }
     const shift = await otc.getCurrentShift({ discordId: userId, credential });
-    if (shift.state.toio !== "out" || shift.state.sInDateTime !== expectedStartedAt) return removeActivityCheck(userId);
+    if (shift.state.toio !== "out" || shift.state.sInDateTime !== expectedStartedAt) {
+      await deleteActivityMessage(record);
+      return removeActivityCheck(userId);
+    }
     await otc.clock({ discordId: userId, credential, action: "out" });
+    await deleteActivityMessage(record);
     removeActivityCheck(userId);
     await disconnectFromVoice(userId);
-    const channel = await client.channels.fetch(PANEL_CHANNEL_ID).catch(() => null);
-    if (channel?.isTextBased()) {
-      await channel.send({ content: `⏱️ <@${userId}> no confirmó que seguía de servicio en 5 minutos. Su fichaje se ha cerrado.`, allowedMentions: { users: [userId] } }).catch(() => {});
-    }
+    await sendActivityLog(userId, false);
   }
 
   async function requestActivityCheck(userId) {
@@ -142,7 +169,7 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
     if (!channel?.isTextBased()) throw new OtcError("No se encontró el canal del panel OTC.");
     const token = randomUUID();
     const expiresAt = now() + ACTIVITY_GRACE_MS;
-    await channel.send({
+    const message = await channel.send({
       content: `<@${userId}> ¿sigues de servicio? Pulsa el botón **Sigo de servicio** en los próximos 5 minutos para mantener tu fichaje abierto.`,
       components: [new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`${ACTIVITY_CHECK_PREFIX}${token}`).setLabel("Sigo de servicio").setStyle(ButtonStyle.Success)
@@ -153,6 +180,8 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
     record.nextCheckAt = expiresAt;
     record.activityToken = token;
     record.activityExpiresAt = expiresAt;
+    record.activityChannelId = channel.id;
+    record.activityMessageId = message.id;
     saveActivity(data.active);
     activitySessions.set(token, { userId, startedAt: record.startedAt, expiresAt });
     scheduleActivityCheck(userId, ACTIVITY_GRACE_MS);
@@ -168,21 +197,34 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
     const session = activitySessions.get(token)
       || (persistedRecord ? { userId: persistedUserId, startedAt: persistedRecord.startedAt, expiresAt: persistedRecord.activityExpiresAt } : null);
 
-    if (!session || session.userId !== interaction.user.id || now() >= session.expiresAt) {
-      return interaction.update({ content: "⏱️ Esta comprobación ha caducado.", components: [], allowedMentions: { parse: [] } });
+    if (!session) {
+      await interaction.message.delete().catch(() => {});
+      return interaction.reply({ content: "Esta comprobación ha caducado.", ephemeral: true });
+    }
+    if (session.userId !== interaction.user.id) {
+      return interaction.reply({ content: "Este botón solo puede usarlo la persona mencionada.", ephemeral: true });
+    }
+    if (now() >= session.expiresAt) {
+      await interaction.message.delete().catch(() => {});
+      return interaction.reply({ content: "Esta comprobación ha caducado.", ephemeral: true });
     }
     const record = data.active[interaction.user.id];
     if (!record || record.startedAt !== session.startedAt || !record.pending || record.activityToken !== token) {
-      return interaction.update({ content: "⏱️ Ya no tienes una comprobación de servicio pendiente.", components: [], allowedMentions: { parse: [] } });
+      await interaction.message.delete().catch(() => {});
+      return interaction.reply({ content: "Ya no tienes una comprobación de servicio pendiente.", ephemeral: true });
     }
     activitySessions.delete(token);
+    await interaction.message.delete().catch(() => {});
     record.pending = false;
     delete record.activityToken;
     delete record.activityExpiresAt;
+    delete record.activityChannelId;
+    delete record.activityMessageId;
     record.nextCheckAt = now() + ACTIVITY_INTERVAL_MS;
     saveActivity(data.active);
     scheduleActivityCheck(interaction.user.id, ACTIVITY_INTERVAL_MS);
-    await interaction.update({ content: `✅ <@${interaction.user.id}> ha confirmado que sigue de servicio.`, components: [], allowedMentions: { users: [interaction.user.id] } });
+    await sendActivityLog(interaction.user.id, true);
+    await interaction.reply({ content: "✅ Has confirmado que sigues de servicio.", ephemeral: true });
   }
 
   async function resumeActivityChecks() {
