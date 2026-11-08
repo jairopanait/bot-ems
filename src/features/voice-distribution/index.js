@@ -42,8 +42,7 @@ function register(client, config) {
     if (!noOneInDistribution) cityIsAlone = false;
     if (snapshot !== lastSnapshot) {
       const embed = new EmbedBuilder()
-        .setColor(0x2ecc71)
-        .setTitle("Doctor Salidorro EMS")
+        .setColor(0x7b1113)
         .setDescription(`# **📋 DISTRIBUCIÓN OBLIGATORIA**\n\n${lines.join("\n\n")}`)
         .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊 · Actualización automática" })
         .setTimestamp();
