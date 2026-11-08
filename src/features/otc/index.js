@@ -3,6 +3,7 @@ const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Events,
   ModalBuilder, TextInputBuilder, TextInputStyle
 } = require("discord.js");
+const { elapsedMilliseconds, formatDuration } = require("./time");
 const { createJsonStore } = require("../../storage");
 const { createOtcClient, OtcError, OtcAuthError, COMPANY_NAME } = require("./client");
 
@@ -24,18 +25,6 @@ function timeFromOtc(value) {
   return match ? match[1].padStart(5, "0") : "No disponible";
 }
 
-function formatDuration(startedAt, finishedAt, timeZone) {
-  // OTC devuelve la entrada sin zona horaria. Calculamos con las horas locales
-  // de OTC para no perder una hora cuando Railway ejecuta el proceso en UTC.
-  const startMatch = timeFromOtc(startedAt).match(/^(\d{2}):(\d{2})$/);
-  const endMatch = formatTime(finishedAt, timeZone).match(/^(\d{2}):(\d{2})$/);
-  if (!startMatch || !endMatch) return "No disponible";
-  const startMinutes = Number(startMatch[1]) * 60 + Number(startMatch[2]);
-  const endMinutes = Number(endMatch[1]) * 60 + Number(endMatch[2]);
-  let minutes = endMinutes - startMinutes;
-  if (minutes < 0) minutes += 24 * 60;
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
-}
 
 function exitReceipt(result) {
   const exitTime = formatTime(result.confirmedAt, result.timeZone || "Europe/Madrid");
@@ -206,13 +195,14 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
       if (!credential) throw new OtcAuthError("Introduce tu contraseña de OTC para vincular tu cuenta.");
       if (action === "out" && !skipShortShiftConfirmation) {
         const shift = await otc.getCurrentShift({ discordId: userId, credential });
-        const startedAt = Date.parse(shift.state.sInDateTime);
-        const elapsedMs = Date.now() - startedAt;
-        if (!Number.isFinite(startedAt) || elapsedMs < 30 * 60 * 1000) {
+        const elapsedMs = elapsedMilliseconds(shift.state.sInDateTime, now(), shift.timeZone);
+        if (!Number.isFinite(elapsedMs) || elapsedMs < 30 * 60 * 1000) {
           const token = randomUUID();
           sessions.set(token, { userId, action, expiresAt: now() + 300000, shortShiftConfirmation: true });
           return interaction.editReply({
-            content: "⚠️ **¿Seguro que quieres finalizar el fichaje?** Llevas menos de **30 minutos de servicio**.",
+            content: Number.isFinite(elapsedMs)
+              ? "⚠️ **¿Seguro que quieres finalizar el fichaje?** Llevas menos de **30 minutos de servicio**."
+              : "⚠️ No se pudo calcular la duración de este fichaje. **¿Seguro que quieres finalizarlo?**",
             components: [new ActionRowBuilder().addComponents(
               new ButtonBuilder().setCustomId(`${CONFIRM_OUT_PREFIX}${token}`).setLabel("Sí, finalizar fichaje").setStyle(ButtonStyle.Danger)
             )],
