@@ -1,6 +1,7 @@
 const { EmbedBuilder, Events } = require("discord.js");
 const PANEL_CHANNEL_ID = "1129104016912154644";
 const H50_ROLE_ID = "1543639741751103609";
+const CITY_ALONE_THREAD_ID = "1374095276192825367";
 const CITY_ALONE_ROLE_ID = "1129103467294769214";
 const LINES = [
   { label: "🚁 UNIDAD UEA", channelId: "1129104126429638717" },
@@ -37,24 +38,26 @@ function register(client, config) {
       ...voiceLines.map(({ label, members }) => `**${label}: ${mentions(members)}**`)
     ];
     const snapshot = lines.join("\n");
-    if (snapshot === lastSnapshot) return;
-    const noOneInDistribution = voiceLines.every(({ members }) => members.length === 0);
-    if (noOneInDistribution) {
+    const noOneInDistribution = h50Members.length === 0 && voiceLines.every(({ members }) => members.length === 0);
+    if (!noOneInDistribution) cityIsAlone = false;
+    if (snapshot !== lastSnapshot) {
+      const embed = new EmbedBuilder()
+        .setColor(0x2ecc71)
+        .setTitle("Doctor Salidorro EMS")
+        .setDescription(`# **📋 DISTRIBUCIÓN OBLIGATORIA**\n\n${lines.join("\n\n")}`)
+        .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊 · Actualización automática" })
+        .setTimestamp();
+      await panelChannel.send({ embeds: [embed], allowedMentions: { parse: [] } });
       lastSnapshot = snapshot;
-      if (cityIsAlone) return;
-      cityIsAlone = true;
-      await panelChannel.send({ content: `<@&${CITY_ALONE_ROLE_ID}> **CIUDAD SOLA**`, allowedMentions: { roles: [CITY_ALONE_ROLE_ID] } });
-      return;
     }
-    cityIsAlone = false;
-    const embed = new EmbedBuilder()
-      .setColor(0x2ecc71)
-      .setTitle("Doctor Salidorro EMS")
-      .setDescription(`# **📋 DISTRIBUCIÓN OBLIGATORIA**\n\n${lines.join("\n\n")}`)
-      .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊 · Actualización automática" })
-      .setTimestamp();
-    await panelChannel.send({ embeds: [embed], allowedMentions: { parse: [] } });
-    lastSnapshot = snapshot;
+    // Keep the empty template in the distribution channel; alert only in its thread.
+    // Commit the alert state after sending so a failed send can be retried.
+    if (noOneInDistribution && !cityIsAlone) {
+      const thread = await client.channels.fetch(CITY_ALONE_THREAD_ID);
+      if (!thread?.isThread() || !thread.isTextBased() || thread.guildId !== config.guildId) throw new Error("Hilo de CIUDAD SOLA no válido.");
+      await thread.send({ content: `<@&${CITY_ALONE_ROLE_ID}> **CIUDAD SOLA**`, allowedMentions: { roles: [CITY_ALONE_ROLE_ID] } });
+      cityIsAlone = true;
+    }
   }
 
   function schedulePublish() {
