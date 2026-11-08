@@ -85,7 +85,7 @@ test("Panel persists, reuses one message, and shows green ENTRADA/red SALIDA", a
   await new Promise(setImmediate);
   assert.equal(payloads.length, 2);
   const buttons = payloads[0].components[0].toJSON().components;
-  assert.deepEqual(buttons.map((b) => [b.label, b.style]), [["ENTRADA", ButtonStyle.Success], ["SALIDA", ButtonStyle.Danger]]);
+  assert.deepEqual(buttons.map((b) => [b.label, b.style]), [["ENTRADA", ButtonStyle.Success], ["SALIDA", ButtonStyle.Danger], ["RESTAR HORAS", ButtonStyle.Secondary]]);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, "otc-panel.json"))), { panelMessageId: "panel" });
 });
 
@@ -99,7 +99,7 @@ test("First private form links account; later buttons clock directly with no pas
   const client = { once: () => {}, on: (e, fn) => { handlers[e] = fn; }, channels: { fetch: async () => ({ guildId: "guild", isTextBased: () => true, send: async (p) => logs.push(p) }) } };
   const otc = {
     authenticate: async ({ password }) => { assert.equal(password, "private-fixture"); return { credential }; },
-    getCurrentShift: async () => ({ state: { sInDateTime: "2020-01-01T00:00:00Z" } }),
+    getCurrentShift: async () => ({ state: { sInDateTime: new Date(time - 3600000).toISOString() }, timeZone: "Europe/Madrid" }),
     clock: async (args) => { if (!valid) throw new OtcAuthError("Contraseña cambiada"); calls.push(args); return { action: args.action, confirmedAt: new Date() }; }
   };
   feature.register(client, config, { now: () => time, otc });
@@ -112,7 +112,7 @@ test("First private form links account; later buttons clock directly with no pas
   assert.equal(calls.length, 0);
   await handlers[Events.InteractionCreate](submit());
   assert.deepEqual(calls[0], { discordId: userId, credential, action: "in" });
-  assert.equal(logs.length, 1);
+  assert.equal(logs.length, 0);
   assert(!JSON.stringify(logs).includes("private-fixture"));
   await handlers[Events.InteractionCreate](submit());
   assert.equal(calls.length, 1); // Single use.
@@ -127,7 +127,7 @@ test("First private form links account; later buttons clock directly with no pas
   time += 31000;
   valid = false;
   await handlers[Events.InteractionCreate](button);
-  assert.equal(logs.length, 2); // Invalid saved credential never produces success log.
+  assert.equal(logs.length, 0); // OTC punches are intentionally excluded from command logs.
   const renewalId = replies.at(-1).components[0].toJSON().components[0].custom_id;
   assert.equal(renewalId, "otc:renew:in");
   await handlers[Events.InteractionCreate]({ ...button, customId: renewalId });
