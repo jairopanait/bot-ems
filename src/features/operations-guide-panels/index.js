@@ -34,7 +34,8 @@ function register(client, config) {
         { name: "2️⃣ Fichajes posteriores", value: "Después de validar la primera vez, la contraseña queda guardada de forma protegida y **solo tendrás que usar los botones ENTRADA o SALIDA**." },
         { name: "⚠️ Salida corta", value: "Si llevas menos de 30 minutos de servicio, el bot pide confirmación antes de finalizar." },
         { name: "📸 Comprobante", value: "Al salir se muestra un resumen privado con Nombre IC, entrada, salida y duración para hacer captura." },
-        { name: "⏳ Restar horas", value: "El botón **RESTAR HORAS** abre una solicitud con horas, minutos y razón para su revisión." }
+        { name: "⏳ Restar horas", value: "El botón **RESTAR HORAS** abre una solicitud con horas, minutos y razón para su revisión." },
+        { name: "🛡️ Comprobación de servicio", value: "Cada hora recibirás una mención con el botón **Sigo de servicio**. Tienes **5 minutos** para confirmarlo; si no respondes, el bot cerrará tu fichaje y te desconectará del canal de voz." }
       )
       .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊" })
       .setTimestamp();
