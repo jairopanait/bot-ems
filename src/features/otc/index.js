@@ -83,6 +83,39 @@ function register(client, config, { otc = createOtcClient(), now = Date.now, cre
   client.once(Events.ClientReady, () => {
     publishPanel().catch(() => console.error("No se pudo publicar el panel de fichaje OTC."));
   });
+  client.on(Events.MessageCreate, async (message) => {
+    if (message.author.bot || !message.inGuild() || message.guildId !== config.guildId || message.content.trim().toLowerCase() !== "!fichajes") return;
+    if (!message.member?.roles.cache.has("1135516317097660538")) return;
+    await message.delete().catch(() => {});
+    try {
+      await listOpenShifts(message);
+    } catch {
+      await message.channel.send({ content: "No se pudieron consultar los fichajes OTC en este momento.", allowedMentions: { parse: [] } }).catch(() => {});
+    }
+  });
+  async function listOpenShifts(message) {
+    const storedUserIds = typeof credentials.listUserIds === "function" ? credentials.listUserIds() : [];
+    const results = await Promise.all(storedUserIds.map(async (userId) => {
+      try {
+        const shift = await otc.getCurrentShift({ discordId: userId, credential: credentials.get(userId) });
+        if (shift.state.toio !== "out") return null;
+        const nameIc = shift.user.FullName || [shift.user.FirstName, shift.user.LastName].filter(Boolean).join(" ") || shift.user.Name || shift.user.UserName || userId;
+        return { userId, nameIc, startedAt: timeFromOtc(shift.state.sInDateTime) };
+      } catch {
+        return null;
+      }
+    }));
+    const active = results.filter(Boolean).sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+    const lines = active.slice(0, 25).map((entry) => `• <@${entry.userId}> — **${entry.nameIc}** · desde **${entry.startedAt}**`);
+    const embed = new EmbedBuilder()
+      .setColor(0x7b1113)
+      .setTitle("🕒 Fichajes OTC abiertos")
+      .setDescription(lines.length ? lines.join("\n") : "No hay fichajes abiertos entre las cuentas OTC vinculadas.")
+      .setFooter({ text: active.length > 25 ? `Mostrando 25 de ${active.length} fichajes · Doctor Salidorro EMS - LaNaranjaRP🍊` : "Doctor Salidorro EMS - LaNaranjaRP🍊" })
+      .setTimestamp();
+    await message.channel.send({ embeds: [embed], allowedMentions: { parse: [] } });
+  }
+
   async function openHoursDeductionForm(interaction) {
     for (const [key, session] of sessions) if (now() >= session.expiresAt) sessions.delete(key);
     const token = randomUUID();
