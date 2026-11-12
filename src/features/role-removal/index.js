@@ -88,17 +88,21 @@ function register(client, config) {
       content: "⌛ Retirando los roles seleccionados de sus miembros…",
       allowedMentions: { parse: [] }
     });
+    let stage = "cargar los miembros del servidor";
     try {
       await message.guild.members.fetch();
       const results = [];
       let blockedRole = null;
       let remainingCount = 0;
       for (const role of roles) {
+        stage = "retirar el rol " + role.name;
         const members = [...message.guild.members.cache.values()];
         const result = await removeFromMembers(role, members, "!quitar ejecutado por " + message.author.tag);
+        stage = "verificar el rol " + role.name;
         await message.guild.members.fetch();
         const remaining = [...message.guild.members.cache.values()].filter((member) => !member.user.bot && member.roles.cache.has(role.id));
         results.push({ role, ...result, remaining: remaining.length });
+        stage = "registrar el resultado";
         await sendRemovalLog(client, config, role, result.removedIds, message.author.id).catch((error) => console.error("No se pudo registrar !quitar:", error));
         if (remaining.length) {
           blockedRole = role;
@@ -106,6 +110,7 @@ function register(client, config) {
           break;
         }
       }
+      stage = "publicar el resumen";
       const totalRemoved = results.reduce((total, result) => total + result.removed, 0);
       const totalFailed = results.reduce((total, result) => total + result.failed, 0);
       const lines = results.map((result) => "• <@&" + result.role.id + ">: **" + result.removed + "** retirada(s)");
@@ -123,7 +128,8 @@ function register(client, config) {
       await notice.edit({ content: "", embeds: [embed], allowedMentions: { parse: [] } });
     } catch (error) {
       console.error("Error en !quitar:", error);
-      await notice.edit({ content: "No se pudo completar la retirada de roles.", embeds: [], allowedMentions: { parse: [] } }).catch(() => {});
+      const detail = error instanceof Error && error.message ? error.message.slice(0, 180) : "Error desconocido";
+      await notice.edit({ content: "No se pudo completar la retirada al intentar " + stage + ". Motivo: " + detail, embeds: [], allowedMentions: { parse: [] } }).catch(() => {});
     }
   });
 }
