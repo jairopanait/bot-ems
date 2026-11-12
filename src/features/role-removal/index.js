@@ -1,6 +1,7 @@
 const { EmbedBuilder, Events } = require("discord.js");
 
 const ALLOWED_ROLE_ID = "1135516317097660538";
+const LOG_CHANNEL_ID = "1568442270120808569";
 
 function roleIdsFromCommand(content) {
   const trimmed = content.trim();
@@ -9,15 +10,35 @@ function roleIdsFromCommand(content) {
 }
 
 async function removeFromMembers(role, members, reason) {
-  let removed = 0;
+  const removedIds = [];
   let failed = 0;
   const affected = members.filter((member) => !member.user.bot && member.roles.cache.has(role.id));
   for (let index = 0; index < affected.length; index += 5) {
-    const results = await Promise.all(affected.slice(index, index + 5).map((member) => member.roles.remove(role, reason).then(() => true).catch(() => false)));
-    removed += results.filter(Boolean).length;
+    const results = await Promise.all(affected.slice(index, index + 5).map((member) => member.roles.remove(role, reason).then(() => member.id).catch(() => null)));
+    removedIds.push(...results.filter(Boolean));
     failed += results.filter((result) => !result).length;
   }
-  return { removed, failed };
+  return { removed: removedIds.length, failed, removedIds };
+}
+
+async function sendRemovalLog(client, config, role, removedIds, executorId) {
+  if (!removedIds.length) return;
+  const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+  if (!channel?.isTextBased() || channel.guildId !== config.guildId) return;
+  for (let index = 0; index < removedIds.length; index += 40) {
+    const users = removedIds.slice(index, index + 40).map((userId) => `<@${userId}>`).join("\n");
+    const embed = new EmbedBuilder()
+      .setColor(0x7b1113)
+      .setTitle("🗑️ Retirada masiva de rol")
+      .setDescription(`El rol <@&${role.id}> se retiró de los siguientes usuarios:`)
+      .addFields(
+        { name: "Usuarios retirados", value: users || "—" },
+        { name: "Ejecutado por", value: `<@${executorId}>` }
+      )
+      .setFooter({ text: `Doctor Salidorro EMS - LaNaranjaRP🍊 · Parte ${Math.floor(index / 40) + 1}` })
+      .setTimestamp();
+    await channel.send({ embeds: [embed], allowedMentions: { parse: [] } });
+  }
 }
 
 function register(client, config) {
@@ -51,6 +72,7 @@ function register(client, config) {
       for (const role of roles) {
         const result = await removeFromMembers(role, members, "!quitar ejecutado por " + message.author.tag);
         results.push({ role, ...result });
+        await sendRemovalLog(client, config, role, result.removedIds, message.author.id).catch((error) => console.error("No se pudo registrar !quitar:", error));
       }
       const totalRemoved = results.reduce((total, result) => total + result.removed, 0);
       const totalFailed = results.reduce((total, result) => total + result.failed, 0);
