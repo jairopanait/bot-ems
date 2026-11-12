@@ -90,23 +90,33 @@ function register(client, config) {
     });
     try {
       await message.guild.members.fetch();
-      const members = [...message.guild.members.cache.values()];
       const results = [];
+      let blockedRole = null;
+      let remainingCount = 0;
       for (const role of roles) {
+        const members = [...message.guild.members.cache.values()];
         const result = await removeFromMembers(role, members, "!quitar ejecutado por " + message.author.tag);
-        results.push({ role, ...result });
+        await message.guild.members.fetch();
+        const remaining = [...message.guild.members.cache.values()].filter((member) => !member.user.bot && member.roles.cache.has(role.id));
+        results.push({ role, ...result, remaining: remaining.length });
         await sendRemovalLog(client, config, role, result.removedIds, message.author.id).catch((error) => console.error("No se pudo registrar !quitar:", error));
+        if (remaining.length) {
+          blockedRole = role;
+          remainingCount = remaining.length;
+          break;
+        }
       }
       const totalRemoved = results.reduce((total, result) => total + result.removed, 0);
       const totalFailed = results.reduce((total, result) => total + result.failed, 0);
       const lines = results.map((result) => "• <@&" + result.role.id + ">: **" + result.removed + "** retirada(s)");
       const embed = new EmbedBuilder()
         .setColor(0x7b1113)
-        .setTitle("🗑️ Roles retirados")
+        .setTitle(blockedRole ? "⚠️ Retirada incompleta" : "🗑️ Roles retirados")
         .setDescription(lines.join("\n"))
         .addFields(
           { name: "Total de retiradas", value: String(totalRemoved), inline: true },
-          { name: "Ejecutado por", value: "<@" + message.author.id + ">", inline: true }
+          { name: "Ejecutado por", value: "<@" + message.author.id + ">", inline: true },
+          { name: "Estado", value: blockedRole ? "Se detuvo: " + remainingCount + " miembro(s) aún conserva(n) <@&" + blockedRole.id + ">. No se procesaron los roles siguientes." : "Todos los roles se verificaron sin miembros.", inline: false }
         )
         .setFooter({ text: totalFailed ? totalFailed + " retirada(s) no pudieron completarse · Doctor Salidorro EMS - LaNaranjaRP🍊" : "Doctor Salidorro EMS - LaNaranjaRP🍊" })
         .setTimestamp();
