@@ -9,14 +9,37 @@ function roleIdsFromCommand(content) {
   return [...new Set([...trimmed.matchAll(/<@&(\d{17,20})>/g)].map((match) => match[1]))];
 }
 
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function removeRoleWithRetry(member, role, reason) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await member.roles.remove(role, reason);
+      return true;
+    } catch (error) {
+      if (attempt === 2) return false;
+      await wait((attempt + 1) * 750);
+    }
+  }
+  return false;
+}
+
 async function removeFromMembers(role, members, reason) {
   const removedIds = [];
   let failed = 0;
   const affected = members.filter((member) => !member.user.bot && member.roles.cache.has(role.id));
-  for (let index = 0; index < affected.length; index += 5) {
-    const results = await Promise.all(affected.slice(index, index + 5).map((member) => member.roles.remove(role, reason).then(() => member.id).catch(() => null)));
-    removedIds.push(...results.filter(Boolean));
-    failed += results.filter((result) => !result).length;
+  for (let index = 0; index < affected.length; index += 2) {
+    const batch = affected.slice(index, index + 2);
+    const results = await Promise.all(batch.map(async (member) => ({
+      member,
+      removed: await removeRoleWithRetry(member, role, reason)
+    })));
+    for (const result of results) {
+      if (result.removed) removedIds.push(result.member.id);
+      else failed += 1;
+    }
   }
   return { removed: removedIds.length, failed, removedIds };
 }
