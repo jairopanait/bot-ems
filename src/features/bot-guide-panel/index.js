@@ -16,6 +16,7 @@ function register(client, config) {
       .addFields(
         { name: "📝 !aceptar @usuario · !rechazar @usuario", value: "**Postulaciones escritas.** `!aceptar` añade los roles de aprobada y anuncia la admisión. `!rechazar` permite elegir el motivo y añade los roles de rechazo según sus intentos.\n**Permiso:** <@&1135516317097660538> · <@&1129103460361576589>" },
         { name: "🩸 !instruccion @usuario", value: "**Instrucciones.** El usuario rellena Nombre IC; se registra su ID, se cambia su apodo a `[🩸] Nombre IC`, se quitan roles de postulación y se añaden los de EMS.\n**Permiso:** <@&1129103424311541790>" },
+        { name: "🗑️ !quitar @rol", value: "**Retirada masiva de rol.** Retira el rol mencionado de todas las personas que lo tengan. El comando se borra y muestra el total retirado al terminar.\n**Permiso:** <@&1135516317097660538>" },
         { name: "📋 !inactividades", value: "**Consulta privada** de inactividades totales, parciales e indefinidas vigentes. No cambia roles.\n**Permiso:** <@&1135516317097660538>" },
         { name: "📤 !renuncia @usuario", value: "**Salida de facción.** Pide motivo y blacklist; retira apodo y roles no preservados, añade el rol de salida y registra la plantilla.\n**Permiso:** <@&1135516317097660538> · <@&1483489497705611408>" },
         { name: "🎖️ !rango", value: "**Solicitud de rango IC.** Pide Rango e ID, envía un embed de solicitud y avisa al rol responsable.\n**Permiso:** <@&1129103467294769214>" },
