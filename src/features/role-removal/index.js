@@ -44,6 +44,18 @@ async function removeFromMembers(role, members, reason) {
   return { removed: removedIds.length, failed, removedIds };
 }
 
+async function listGuildMembers(guild) {
+  const members = [];
+  let after;
+  do {
+    const page = await guild.members.list({ limit: 1000, after });
+    members.push(...page.values());
+    after = page.lastKey();
+    if (page.size < 1000) break;
+  } while (after);
+  return members;
+}
+
 async function sendRemovalLog(client, config, role, removedIds, executorId) {
   if (!removedIds.length) return;
   const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
@@ -90,17 +102,15 @@ function register(client, config) {
     });
     let stage = "cargar los miembros del servidor";
     try {
-      await message.guild.members.fetch();
+      const members = await listGuildMembers(message.guild);
       const results = [];
       let blockedRole = null;
       let remainingCount = 0;
       for (const role of roles) {
         stage = "retirar el rol " + role.name;
-        const members = [...message.guild.members.cache.values()];
         const result = await removeFromMembers(role, members, "!quitar ejecutado por " + message.author.tag);
         stage = "verificar el rol " + role.name;
-        await message.guild.members.fetch();
-        const remaining = [...message.guild.members.cache.values()].filter((member) => !member.user.bot && member.roles.cache.has(role.id));
+        const remaining = members.filter((member) => !member.user.bot && member.roles.cache.has(role.id));
         results.push({ role, ...result, remaining: remaining.length });
         stage = "registrar el resultado";
         await sendRemovalLog(client, config, role, result.removedIds, message.author.id).catch((error) => console.error("No se pudo registrar !quitar:", error));
