@@ -14,7 +14,7 @@ function register(client, config) {
       .setTitle("📖 Comandos por rango")
       .setDescription("Aquí tienes los comandos disponibles para los rangos autorizados.")
       .addFields(
-        { name: "🎖️ !rango", value: "Abre una solicitud de Rango IC e ID.\nPuede usarlo: <@&1129103467294769214>" },
+        { name: "🎖️ !rango", value: "Abre una solicitud con Rango IC en un desplegable e ID; incluye el código ambulance correspondiente.\nPuede usarlo: <@&1129103467294769214>" },
         { name: "💊 !venta", value: "Registra la venta de medkits y calcula el reparto Hospital/EMS.\nPuede usarlo: <@&1129103355126481006> · <@&1129103352488271983> · <@&1129103349594202253> · <@&1129103346872107139> · <@&1129573501209165965> · <@&1129103343709585468> · <@&1129103338793877565> · <@&1129103341520158750> · <@&1135516317097660538>" }
       )
       .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊" })
