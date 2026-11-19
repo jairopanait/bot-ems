@@ -19,10 +19,8 @@ const questions = [
   { key: "icName", label: "Nombre IC", prompt: "¿Cuál es tu nombre IC?", style: TextInputStyle.Short, maxLength: 80 },
   { key: "oocAge", label: "Edad OOC", prompt: "¿Cuál es tu edad OOC?", style: TextInputStyle.Short, maxLength: 30 },
   { key: "serverTime", label: "Tiempo en el servidor", prompt: "¿Cuánto tiempo llevas en el servidor?", style: TextInputStyle.Short, maxLength: 150 },
-  { key: "weeklyTime", label: "Dedicación semanal", prompt: "¿Cuánto tiempo semanal podrías dedicarle a la facción?", style: TextInputStyle.Paragraph, maxLength: 500 },
-  { key: "emsExperience", label: "Experiencia como EMS", prompt: "¿Qué experiencia tienes como EMS?", style: TextInputStyle.Paragraph, maxLength: 1000 },
-  { key: "contribution", label: "Aportación como EMS", prompt: "¿Qué podrías aportar como EMS?", style: TextInputStyle.Paragraph, maxLength: 1000 },
-  { key: "factionHelp", label: "Ayuda a la facción", prompt: "¿Cómo ayudarías a la facción?", style: TextInputStyle.Paragraph, maxLength: 1000 }
+  { key: "whyEms", label: "¿Por qué te gustaría ser EMS?", prompt: "Cuéntanos por qué te gustaría ser EMS.", style: TextInputStyle.Paragraph, maxLength: 1000 },
+  { key: "administrativeSanctions", label: "¿Tienes sanciones administrativas?", prompt: "Indica si tienes sanciones administrativas y explícalas si corresponde.", style: TextInputStyle.Paragraph, maxLength: 1000 }
 ];
 
 function register(client, rootConfig) {
