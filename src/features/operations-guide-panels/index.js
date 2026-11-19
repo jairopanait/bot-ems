@@ -51,7 +51,7 @@ function register(client, config) {
       .setTitle("🔊 Distribución automática")
       .setDescription("La distribución se gestiona automáticamente según los canales de voz; no necesitas usar ningún comando.")
       .addFields(
-        { name: "👥 Qué controla", value: "H-50, Unidad UEA, Unidad UEM, Hospital, Ambulancias 1/2/3, Cirugía, Examen y Eventos." },
+        { name: "👥 Qué controla", value: "H-50, Unidad UEA, Unidad UEM, Hospital, Ambulancias 1/2/3/4, Cirugía, Examen y Eventos." },
         { name: "⏱️ Cuándo se publica", value: "Cuando alguien entra, sale o cambia de canal de voz, espera **15 segundos sin más movimientos** y manda la distribución actualizada." },
         { name: "🩺 Rol H-50", value: "También se actualiza si se añade o retira el rol H-50. Los H-50 aparecen en su línea y en el canal de voz donde se encuentren." },
         { name: "🚨 Ciudad sola", value: "Si todos los canales de distribución quedan vacíos y no hay nadie con el rol H-50, publica la plantilla vacía sin menciones. El aviso <@&1129103467294769214> **CIUDAD SOLA** se envía al hilo <#1374095276192825367>." },
