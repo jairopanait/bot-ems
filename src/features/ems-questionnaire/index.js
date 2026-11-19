@@ -4,7 +4,6 @@ const {
   ButtonStyle,
   EmbedBuilder,
   Events,
-  LabelBuilder,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle
@@ -13,7 +12,6 @@ const { createJsonStore } = require("../../storage");
 const emsLogo = require("./logo");
 
 const START_BUTTON_ID = "ems-questionnaire:start";
-const NEXT_BUTTON_ID = "ems-questionnaire:next";
 const ANSWER_MODAL_ID = "ems-questionnaire:answer";
 const LOGO_ATTACHMENT_NAME = "ems-postulacion-logo.png";
 
@@ -30,23 +28,19 @@ function register(client, rootConfig) {
   const store = createJsonStore(rootConfig.dataDir, "ems-questionnaire.json", { panelMessageId: null });
   const sessions = new Map();
 
-  function buildQuestionModal(index) {
-    const question = questions[index];
+  function buildQuestionnaireModal() {
     return new ModalBuilder()
       .setCustomId(ANSWER_MODAL_ID)
-      .setTitle(`Plantilla EMS — ${index + 1}/${questions.length}`)
-      .addLabelComponents(
-        new LabelBuilder()
+      .setTitle("Postulación EMS")
+      .addComponents(...questions.map((question) => new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId(question.key)
           .setLabel(question.label)
-          .setTextInputComponent(
-            new TextInputBuilder()
-              .setCustomId("answer")
-              .setStyle(question.style)
-              .setPlaceholder(question.prompt)
-              .setRequired(true)
-              .setMaxLength(question.maxLength)
-          )
-      );
+          .setStyle(question.style)
+          .setPlaceholder(question.prompt)
+          .setRequired(true)
+          .setMaxLength(question.maxLength)
+      )));
   }
 
   async function publishPanel() {
@@ -82,19 +76,11 @@ function register(client, rootConfig) {
   }
 
   async function startQuestionnaire(interaction) {
-    sessions.set(interaction.user.id, { index: 0, answers: {}, startedAt: Date.now(), progressMessageCreated: false });
-    await interaction.showModal(buildQuestionModal(0));
+    sessions.set(interaction.user.id, { startedAt: Date.now() });
+    await interaction.showModal(buildQuestionnaireModal());
   }
 
-  async function continueQuestionnaire(interaction) {
-    const session = sessions.get(interaction.user.id);
-    if (!session || session.index >= questions.length) {
-      return interaction.reply({ content: "El formulario ha caducado. Pulsa de nuevo RELLENAR PLANTILLA EMS.", ephemeral: true });
-    }
-    await interaction.showModal(buildQuestionModal(session.index));
-  }
-
-  async function publishAnswers(interaction, session) {
+  async function publishAnswers(interaction, answers) {
     const channel = await client.channels.fetch(config.outputChannelId);
     if (!channel?.isTextBased()) throw new Error("El canal de resultados del cuestionario EMS no es válido.");
 
@@ -104,7 +90,7 @@ function register(client, rootConfig) {
       .setDescription(`Postulación enviada por **${interaction.user.tag}**.`)
       .addFields(questions.map((question) => ({
         name: `→ ${question.label}:`,
-        value: session.answers[question.key].slice(0, 1024)
+        value: answers[question.key].slice(0, 1024)
       })))
       .setTimestamp();
 
@@ -117,34 +103,18 @@ function register(client, rootConfig) {
 
   async function handleAnswer(interaction) {
     const session = sessions.get(interaction.user.id);
-    if (!session || session.index >= questions.length) {
-      return interaction.reply({ content: "El formulario ha caducado. Pulsa de nuevo RELLENAR PLANTILLA EMS.", ephemeral: true });
+    if (!session) {
+      return interaction.reply({ content: "El formulario ha caducado. Pulsa de nuevo 📝 Iniciar Postulación.", ephemeral: true });
     }
 
-    const question = questions[session.index];
-    session.answers[question.key] = interaction.fields.getTextInputValue("answer").trim();
-    session.index += 1;
-
-    if (session.index < questions.length) {
-      const nextQuestion = questions[session.index];
-      const response = {
-        content: `Respuesta guardada (**${session.index}/${questions.length}**). Siguiente: **${nextQuestion.prompt}**`,
-        components: [new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId(NEXT_BUTTON_ID).setLabel("SIGUIENTE PREGUNTA").setStyle(ButtonStyle.Success)
-        )]
-      };
-      if (session.progressMessageCreated && interaction.isFromMessage()) {
-        return interaction.update(response);
-      }
-      session.progressMessageCreated = true;
-      return interaction.reply({ ...response, ephemeral: true });
-    }
-
-    if (session.progressMessageCreated && interaction.isFromMessage()) await interaction.deferUpdate();
-    else await interaction.deferReply({ ephemeral: true });
-    await publishAnswers(interaction, session);
+    const answers = Object.fromEntries(questions.map((question) => [
+      question.key,
+      interaction.fields.getTextInputValue(question.key).trim()
+    ]));
+    await interaction.deferReply({ ephemeral: true });
+    await publishAnswers(interaction, answers);
     sessions.delete(interaction.user.id);
-    await interaction.editReply({ content: "Plantilla enviada correctamente. ¡Gracias!", components: [] });
+    await interaction.editReply({ content: "Postulación enviada correctamente. ¡Gracias!" });
   }
 
   client.once(Events.ClientReady, () => {
@@ -154,7 +124,6 @@ function register(client, rootConfig) {
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
       if (interaction.isButton() && interaction.customId === START_BUTTON_ID) return startQuestionnaire(interaction);
-      if (interaction.isButton() && interaction.customId === NEXT_BUTTON_ID) return continueQuestionnaire(interaction);
       if (interaction.isModalSubmit() && interaction.customId === ANSWER_MODAL_ID) return handleAnswer(interaction);
     } catch (error) {
       console.error("Error en el cuestionario EMS:", error);
