@@ -10,6 +10,7 @@ const LINES = [
   { label: "🚑 AMBULANCIA 1", channelId: "1129104145715052624" },
   { label: "🚑 AMBULANCIA 2", channelId: "1129104149519290540" },
   { label: "🚑 AMBULANCIA 3", channelId: "1542653394580414574" },
+  { label: "🚑 AMBULANCIA 4", channelId: "1573049836989583432" },
   { label: "⛑️ CIRUGIA", channelId: "1130992230157525094" },
   { label: "📓 EXAMEN", channelId: "1379856086982594631" },
   { label: "🎉 EVENTOS", channelId: "1129104164811702332" }
