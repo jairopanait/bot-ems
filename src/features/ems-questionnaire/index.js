@@ -10,10 +10,12 @@ const {
   TextInputStyle
 } = require("discord.js");
 const { createJsonStore } = require("../../storage");
+const emsLogo = require("./logo");
 
 const START_BUTTON_ID = "ems-questionnaire:start";
 const NEXT_BUTTON_ID = "ems-questionnaire:next";
 const ANSWER_MODAL_ID = "ems-questionnaire:answer";
+const LOGO_ATTACHMENT_NAME = "ems-postulacion-logo.png";
 
 const questions = [
   { key: "icName", label: "Nombre IC", prompt: "¿Cuál es tu nombre IC?", style: TextInputStyle.Short, maxLength: 80 },
@@ -52,27 +54,28 @@ function register(client, rootConfig) {
     if (!channel?.isTextBased()) throw new Error("El canal del cuestionario EMS no es válido.");
 
     const embed = new EmbedBuilder()
-      .setTitle("PLANTILLA OBLIGATORIA EMS")
-      .setDescription("Pulsa el botón para rellenar la plantilla obligatoria. Las preguntas aparecerán una por una y tus respuestas serán privadas hasta finalizar.")
-      .setColor(0xc0392b);
+      .setTitle("¿QUIERES POSTULAR A EMS?")
+      .setDescription("Estás a punto de iniciar el procedimiento de postulación escrita para ser parte EMS.\n\n**Requisitos**\n‣ No tener sanciones administrativas graves.\n‣ No estar en Blacklist de facciones legales.\n‣ Tener mínimo 16 años.")
+      .setColor(0x7b1113)
+      .setThumbnail(`attachment://${LOGO_ATTACHMENT_NAME}`);
     const components = [new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(START_BUTTON_ID)
-        .setLabel("RELLENAR PLANTILLA EMS")
-        .setStyle(ButtonStyle.Primary)
+        .setLabel("📝 Iniciar Postulación")
+        .setStyle(ButtonStyle.Success)
     )];
 
     const data = store.read();
     if (data.panelMessageId) {
       const existing = await channel.messages.fetch(data.panelMessageId).catch(() => null);
       if (existing) {
-        await existing.edit({ embeds: [embed], components });
+        await existing.edit({ embeds: [embed], components, files: [{ attachment: Buffer.from(emsLogo, "base64"), name: LOGO_ATTACHMENT_NAME }] });
         console.log(`Panel del cuestionario EMS actualizado en el canal ${config.panelChannelId}.`);
         return;
       }
     }
 
-    const message = await channel.send({ embeds: [embed], components });
+    const message = await channel.send({ embeds: [embed], components, files: [{ attachment: Buffer.from(emsLogo, "base64"), name: LOGO_ATTACHMENT_NAME }] });
     data.panelMessageId = message.id;
     store.write(data);
     console.log(`Panel del cuestionario EMS publicado en el canal ${config.panelChannelId}.`);
