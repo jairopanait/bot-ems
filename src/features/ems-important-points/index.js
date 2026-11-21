@@ -2,8 +2,7 @@ const { EmbedBuilder, Events } = require("discord.js");
 const { createJsonStore } = require("../../storage");
 const helicopterGarageImage = require("./helicopter-garage-image");
 const ambulanceGarageImage = require("./ambulance-garage-image");
-const medicalLockerImage = require("./medical-locker-image");
-const medicalLockerOptionsImage = require("./medical-locker-options-image");
+const medicalLockerImage = require("./medical-locker-combined-image");
 const lockerRoomImage = require("./locker-room-image");
 
 const CHANNEL_ID = "1573737316068098098";
@@ -30,10 +29,7 @@ const POINTS = [
     title: "🗄️ ARMARIO DE MATERIAL MÉDICO",
     description: "**1.** Comprar items\n**2.** Armario personal de cada EMS\n**3.** Inventario colectivo de todas las facciones — **NO USAR**",
     imageName: "punto-armario-medico.jpg",
-    image: medicalLockerImage,
-    extraImageName: "punto-armario-opciones.jpg",
-    extraImage: medicalLockerOptionsImage,
-    extraTitle: "ℹ️ OPCIONES DEL ARMARIO"
+    image: medicalLockerImage
   },
   {
     key: "lockerRoom",
