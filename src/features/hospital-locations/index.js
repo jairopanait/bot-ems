@@ -24,11 +24,11 @@ function register(client, config) {
     };
     const data = store.read();
     const existing = data.receptionMessageId ? await channel.messages.fetch(data.receptionMessageId).catch(() => null) : null;
-    if (existing) await existing.edit(payload);
-    else {
-      const message = await channel.send(payload);
-      store.write({ receptionMessageId: message.id });
-    }
+    // Al adjuntar una imagen, Discord no siempre incorpora archivos nuevos al editar
+    // mensajes ya existentes. Se publica uno nuevo para garantizar que la foto se vea.
+    if (existing) await existing.delete().catch(() => null);
+    const message = await channel.send(payload);
+    store.write({ receptionMessageId: message.id });
   }
 
   client.once(Events.ClientReady, () => publish().catch((error) => console.error("No se pudo publicar la ubicación de Recepción:", error)));
