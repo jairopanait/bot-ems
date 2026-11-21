@@ -15,56 +15,56 @@ const LOCATIONS = [
   {
     messageKey: "receptionMessageId",
     title: "🏥 RECEPCIÓN",
-    description: "**Acceso a vestuarios y armarios personales**\n\nEs la puerta por donde entramos a los vestuarios y armarios personales.",
+    description: "**Acceso a vestuarios y armarios personales.**",
     fileName: "ubicacion-recepcion.jpg",
     image: receptionImage
   },
   {
     messageKey: "floor2MessageId",
     title: "🏢 2ª PLANTA",
-    description: "**Cuidados intensivos, Rayos X, tomografías y quirófanos**\n\nEn esta planta se encuentran las áreas de **Cuidados Intensivos**, **Rayos X**, **Tomografías** y **Quirófanos**.",
+    description: "**Planta que reúne Cuidados Intensivos, Rayos X, Tomografía y Quirófanos.**",
     fileName: "ubicacion-segunda-planta.jpg",
     image: floor2Image
   },
   {
     messageKey: "icuMessageId",
     title: "🩺 CUIDADOS INTENSIVOS",
-    description: "**Área para pacientes postoperatorios**\n\nSala destinada a la atención y vigilancia de pacientes en periodo **postoperatorio**.",
+    description: "**Atención y vigilancia de pacientes en periodo postoperatorio.**",
     fileName: "ubicacion-cuidados-intensivos.jpg",
     image: icuImage
   },
   {
     messageKey: "rayosXMessageId",
     title: "🩻 RAYOS X",
-    description: "**Sala de Rayos X**",
+    description: "**Diagnóstico de lesiones mediante estudios radiográficos.**",
     fileName: "ubicacion-rayos-x.jpg",
     image: rayosXImage
   },
   {
     messageKey: "tomografiaMessageId",
     title: "🧠 TOMOGRAFÍA",
-    description: "**Sala de Tomografía**",
+    description: "**Obtención de imágenes detalladas para evaluar el estado del paciente.**",
     fileName: "ubicacion-tomografia.jpg",
     image: tomografiaImage
   },
   {
     messageKey: "cirugiaMessageId",
     title: "🩺 SALA DE CIRUGÍA",
-    description: "**Quirófano**",
+    description: "**Espacio destinado a intervenciones quirúrgicas.**",
     fileName: "ubicacion-cirugia.jpg",
     image: cirugiaImage
   },
   {
     messageKey: "morgueMessageId",
     title: "⚰️ MORGUE",
-    description: "**Morgue del hospital**",
+    description: "**Custodia temporal de personas fallecidas.**",
     fileName: "ubicacion-morgue.jpg",
     image: morgueImage
   },
   {
     messageKey: "ascensorHelipuertoMessageId",
     title: "🛗 ASCENSOR HELIPUERTO",
-    description: "**Acceso al helipuerto**",
+    description: "**Acceso para traslados aéreos desde y hacia el helipuerto.**",
     fileName: "ubicacion-ascensor-helipuerto.jpg",
     image: ascensorHelipuertoImage
   }
