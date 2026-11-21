@@ -4,6 +4,9 @@ const helicopterGarageImage = require("./helicopter-garage-image");
 const ambulanceGarageImage = require("./ambulance-garage-image");
 const medicalLockerImage = require("./medical-locker-combined-image");
 const lockerRoomImage = require("./locker-room-image");
+const policeTabletImage = require("./police-tablet-image");
+const radioImage = require("./radio-image");
+const referencesImage = require("./references-image");
 
 const CHANNEL_ID = "1573737316068098098";
 const COLOR = 0x7b1113;
@@ -37,6 +40,27 @@ const POINTS = [
     description: "**Zona destinada a cambiar o crear uniformes.**",
     imageName: "punto-vestuario.jpg",
     image: lockerRoomImage
+  },
+  {
+    key: "policeTablet",
+    title: "📱 TABLET POLICIAL",
+    description: "**Para entrar o salir de servicio con el botón verde Servicio y acceder a la radio interna.**",
+    imageName: "punto-tablet-policial.jpg",
+    image: policeTabletImage
+  },
+  {
+    key: "radio",
+    title: "📻 RADIO",
+    description: "**Usa la frecuencia 20 e indica tu rango y nombre IC.**",
+    imageName: "punto-radio.jpg",
+    image: radioImage
+  },
+  {
+    key: "references",
+    title: "📍 REFERENCIAS",
+    description: "**En F7 → Referencias, selecciona el icono y color que corresponda.**",
+    imageName: "punto-referencias.jpg",
+    image: referencesImage
   }
 ];
 
