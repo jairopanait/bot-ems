@@ -4,6 +4,7 @@ const { createJsonStore } = require("../../storage");
 
 const CHANNEL_ID = "1573737079521673388";
 const VIDEO_FILE = path.join(__dirname, "reanimar.mp4");
+const VIDEO_REVISION = 2;
 
 function register(client, config) {
   const store = createJsonStore(config.dataDir, "ems-resuscitation-guide.json", {
@@ -41,7 +42,7 @@ function register(client, config) {
 
     // Los vídeos no se reproducen dentro de un rich embed de Discord. Se envían
     // en el mensaje siguiente para que Discord genere su reproductor nativo.
-    const videoMessage = data.videoMessageId
+    const videoMessage = data.videoRevision === VIDEO_REVISION && data.videoMessageId
       ? await channel.messages.fetch(data.videoMessageId).catch(() => null)
       : null;
     if (!videoMessage) {
@@ -52,6 +53,7 @@ function register(client, config) {
       });
       data.videoMessageId = sentVideo.id;
     }
+    data.videoRevision = VIDEO_REVISION;
 
     store.write(data);
   }
