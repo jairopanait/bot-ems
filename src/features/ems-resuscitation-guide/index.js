@@ -1,7 +1,9 @@
 const { EmbedBuilder, Events } = require("discord.js");
+const path = require("node:path");
 const { createJsonStore } = require("../../storage");
 
 const CHANNEL_ID = "1573737079521673388";
+const VIDEO_FILE = path.join(__dirname, "reanimar.mp4");
 
 function register(client, config) {
   const store = createJsonStore(config.dataDir, "ems-resuscitation-guide.json", { messageId: null });
@@ -28,9 +30,15 @@ function register(client, config) {
       ? await channel.messages.fetch(data.messageId).catch(() => null)
       : null;
 
-    if (existing) await existing.edit({ embeds: [embed] });
+    const payload = {
+      embeds: [embed],
+      files: [{ attachment: VIDEO_FILE, name: "guia-reanimar.mp4" }],
+      allowedMentions: { parse: [] }
+    };
+
+    if (existing) await existing.edit(payload);
     else {
-      const message = await channel.send({ embeds: [embed], allowedMentions: { parse: [] } });
+      const message = await channel.send(payload);
       store.write({ messageId: message.id });
     }
   }
