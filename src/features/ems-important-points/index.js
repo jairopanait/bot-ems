@@ -8,7 +8,8 @@ const policeTabletImage = require("./police-tablet-image");
 const radioImage = require("./radio-image");
 const referencesImage = require("./references-image");
 
-const CHANNEL_ID = "1573737316068098098";
+const MAIN_CHANNEL_ID = "1573737316068098098";
+const OPERATIONS_CHANNEL_ID = "1573736946054725652";
 const COLOR = 0x7b1113;
 const FOOTER = "Doctor Salidorro EMS - LaNaranjaRP🍊 · Puntos importantes EMS";
 
@@ -18,49 +19,59 @@ const POINTS = [
     title: "🚁 GARAJE DE HELICÓPTEROS",
     description: "**Solo la unidad UEA puede sacar helicópteros.**",
     imageName: "punto-garaje-helicopteros.jpg",
-    image: helicopterGarageImage
+    image: helicopterGarageImage,
+    channelId: MAIN_CHANNEL_ID
   },
   {
     key: "ambulanceGarage",
     title: "🚑 GARAJE DE AMBULANCIAS Y MOTOS",
     description: "**Las motos son exclusivas de UEM; usa la ambulancia que corresponde a tu rango según <#1493633203116708081>.**",
     imageName: "punto-garaje-ambulancias.jpg",
-    image: ambulanceGarageImage
+    image: ambulanceGarageImage,
+    channelId: MAIN_CHANNEL_ID
   },
   {
     key: "medicalLocker",
     title: "🗄️ ARMARIO DE MATERIAL MÉDICO",
     description: "**1.** Comprar items\n**2.** Armario personal de cada EMS\n**3.** Inventario colectivo de todas las facciones — **NO USAR**",
     imageName: "punto-armario-medico.jpg",
-    image: medicalLockerImage
+    image: medicalLockerImage,
+    channelId: MAIN_CHANNEL_ID
   },
   {
     key: "lockerRoom",
     title: "👕 VESTUARIO",
     description: "**Zona destinada a cambiar o crear uniformes.**",
     imageName: "punto-vestuario.jpg",
-    image: lockerRoomImage
+    image: lockerRoomImage,
+    channelId: MAIN_CHANNEL_ID
   },
   {
     key: "policeTablet",
     title: "📱 TABLET POLICIAL",
     description: "**Para entrar o salir de servicio con el botón verde Servicio y acceder a la radio interna.**",
     imageName: "punto-tablet-policial.jpg",
-    image: policeTabletImage
+    image: policeTabletImage,
+    channelId: OPERATIONS_CHANNEL_ID,
+    previousChannelId: MAIN_CHANNEL_ID
   },
   {
     key: "radio",
     title: "📻 RADIO",
     description: "**Usa la frecuencia 20 e indica tu rango y nombre IC.**",
     imageName: "punto-radio.jpg",
-    image: radioImage
+    image: radioImage,
+    channelId: OPERATIONS_CHANNEL_ID,
+    previousChannelId: MAIN_CHANNEL_ID
   },
   {
     key: "references",
     title: "📍 REFERENCIAS",
     description: "**En F7 → Referencias, selecciona el icono y color que corresponda.**",
     imageName: "punto-referencias.jpg",
-    image: referencesImage
+    image: referencesImage,
+    channelId: OPERATIONS_CHANNEL_ID,
+    previousChannelId: MAIN_CHANNEL_ID
   }
 ];
 
@@ -76,12 +87,24 @@ function buildEmbed(point) {
 function register(client, config) {
   const store = createJsonStore(config.dataDir, "ems-important-points.json", { messageIds: {} });
 
-  async function publishPoint(channel, point) {
+  async function publishPoint(point) {
+    const channel = await client.channels.fetch(point.channelId).catch(() => null);
+    if (!channel?.isTextBased() || channel.guildId !== config.guildId) {
+      throw new Error("Canal de puntos importantes EMS no válido.");
+    }
     const data = store.read();
     const messageIds = data.messageIds || {};
     const oldMessage = messageIds[point.key]
       ? await channel.messages.fetch(messageIds[point.key]).catch(() => null)
       : null;
+
+    if (point.previousChannelId && messageIds[point.key]) {
+      const previousChannel = await client.channels.fetch(point.previousChannelId).catch(() => null);
+      const previousMessage = previousChannel?.isTextBased()
+        ? await previousChannel.messages.fetch(messageIds[point.key]).catch(() => null)
+        : null;
+      if (previousMessage) await previousMessage.delete().catch(() => null);
+    }
 
     const embeds = [buildEmbed(point)];
     const files = [{ attachment: Buffer.from(point.image, "base64"), name: point.imageName }];
@@ -103,13 +126,8 @@ function register(client, config) {
   }
 
   async function publish() {
-    const channel = await client.channels.fetch(CHANNEL_ID).catch(() => null);
-    if (!channel?.isTextBased() || channel.guildId !== config.guildId) {
-      throw new Error("Canal de puntos importantes EMS no válido.");
-    }
-
     for (const point of POINTS) {
-      await publishPoint(channel, point);
+      await publishPoint(point);
     }
   }
 
