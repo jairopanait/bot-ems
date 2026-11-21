@@ -3,74 +3,111 @@ const { createJsonStore } = require("../../storage");
 const receptionImage = require("./reception-image");
 const floor2Image = require("./floor2-image");
 const icuImage = require("./icu-image");
+const rayosXImage = require("./rayosx-image");
+const tomografiaImage = require("./tomografia-image");
+const cirugiaImage = require("./cirugia-image");
+const morgueImage = require("./morgue-image");
+const ascensorHelipuertoImage = require("./ascensor-helipuerto-image");
 
 const CHANNEL_ID = "1573736527434088571";
-const RECEPTION_IMAGE_NAME = "ubicacion-recepcion.jpg";
-const FLOOR2_IMAGE_NAME = "ubicacion-segunda-planta.jpg";
-const ICU_IMAGE_NAME = "ubicacion-cuidados-intensivos.jpg";
+
+const LOCATIONS = [
+  {
+    messageKey: "receptionMessageId",
+    title: "🏥 RECEPCIÓN",
+    description: "**Acceso a vestuarios y armarios personales**\n\nEs la puerta por donde entramos a los vestuarios y armarios personales.",
+    fileName: "ubicacion-recepcion.jpg",
+    image: receptionImage
+  },
+  {
+    messageKey: "floor2MessageId",
+    title: "🏢 2ª PLANTA",
+    description: "**Cuidados intensivos, Rayos X, tomografías y quirófanos**\n\nEn esta planta se encuentran las áreas de **Cuidados Intensivos**, **Rayos X**, **Tomografías** y **Quirófanos**.",
+    fileName: "ubicacion-segunda-planta.jpg",
+    image: floor2Image
+  },
+  {
+    messageKey: "icuMessageId",
+    title: "🩺 CUIDADOS INTENSIVOS",
+    description: "**Área para pacientes postoperatorios**\n\nSala destinada a la atención y vigilancia de pacientes en periodo **postoperatorio**.",
+    fileName: "ubicacion-cuidados-intensivos.jpg",
+    image: icuImage
+  },
+  {
+    messageKey: "rayosXMessageId",
+    title: "🩻 RAYOS X",
+    description: "**Sala de Rayos X**",
+    fileName: "ubicacion-rayos-x.jpg",
+    image: rayosXImage
+  },
+  {
+    messageKey: "tomografiaMessageId",
+    title: "🧠 TOMOGRAFÍA",
+    description: "**Sala de Tomografía**",
+    fileName: "ubicacion-tomografia.jpg",
+    image: tomografiaImage
+  },
+  {
+    messageKey: "cirugiaMessageId",
+    title: "🩺 SALA DE CIRUGÍA",
+    description: "**Quirófano**",
+    fileName: "ubicacion-cirugia.jpg",
+    image: cirugiaImage
+  },
+  {
+    messageKey: "morgueMessageId",
+    title: "⚰️ MORGUE",
+    description: "**Morgue del hospital**",
+    fileName: "ubicacion-morgue.jpg",
+    image: morgueImage
+  },
+  {
+    messageKey: "ascensorHelipuertoMessageId",
+    title: "🛗 ASCENSOR HELIPUERTO",
+    description: "**Acceso al helipuerto**",
+    fileName: "ubicacion-ascensor-helipuerto.jpg",
+    image: ascensorHelipuertoImage
+  }
+];
 
 function register(client, config) {
-  const store = createJsonStore(config.dataDir, "hospital-locations.json", {
-    receptionMessageId: null,
-    floor2MessageId: null,
-    icuMessageId: null
-  });
+  const store = createJsonStore(config.dataDir, "hospital-locations.json", {});
 
-  async function publishLocation({ messageKey, title, description, fileName, image }) {
-    const channel = await client.channels.fetch(CHANNEL_ID).catch(() => null);
-    if (!channel?.isTextBased() || channel.guildId !== config.guildId) {
-      throw new Error("Canal de ubicaciones del hospital no válido.");
-    }
-
+  async function publishLocation(channel, location) {
     const embed = new EmbedBuilder()
       .setColor(0x7b1113)
-      .setTitle(title)
-      .setDescription(description)
-      .setImage("attachment://" + fileName)
+      .setTitle(location.title)
+      .setDescription(location.description)
+      .setImage("attachment://" + location.fileName)
       .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊 · Ubicaciones del hospital" });
 
     const payload = {
       embeds: [embed],
-      files: [{ attachment: Buffer.from(image, "base64"), name: fileName }],
+      files: [{ attachment: Buffer.from(location.image, "base64"), name: location.fileName }],
       allowedMentions: { parse: [] }
     };
 
     const data = store.read();
-    const existing = data[messageKey]
-      ? await channel.messages.fetch(data[messageKey]).catch(() => null)
+    const existing = data[location.messageKey]
+      ? await channel.messages.fetch(data[location.messageKey]).catch(() => null)
       : null;
 
     // Discord no siempre adjunta archivos nuevos al editar mensajes existentes.
     // Se publica uno nuevo para garantizar que la foto se vea.
     if (existing) await existing.delete().catch(() => null);
     const message = await channel.send(payload);
-    store.write({ ...data, [messageKey]: message.id });
+    store.write({ ...data, [location.messageKey]: message.id });
   }
 
   async function publish() {
-    await publishLocation({
-      messageKey: "receptionMessageId",
-      title: "🏥 RECEPCIÓN",
-      description: "**Acceso a vestuarios y armarios personales**\n\nEs la puerta por donde entramos a los vestuarios y armarios personales.",
-      fileName: RECEPTION_IMAGE_NAME,
-      image: receptionImage
-    });
+    const channel = await client.channels.fetch(CHANNEL_ID).catch(() => null);
+    if (!channel?.isTextBased() || channel.guildId !== config.guildId) {
+      throw new Error("Canal de ubicaciones del hospital no válido.");
+    }
 
-    await publishLocation({
-      messageKey: "floor2MessageId",
-      title: "🏢 2ª PLANTA",
-      description: "**Cuidados intensivos, Rayos X, tomografías y quirófanos**\n\nEn esta planta se encuentran las áreas de **Cuidados Intensivos**, **Rayos X**, **Tomografías** y **Quirófanos**.",
-      fileName: FLOOR2_IMAGE_NAME,
-      image: floor2Image
-    });
-
-    await publishLocation({
-      messageKey: "icuMessageId",
-      title: "🩺 CUIDADOS INTENSIVOS",
-      description: "**Área para pacientes postoperatorios**\n\nSala destinada a la atención y vigilancia de pacientes en periodo **postoperatorio**.",
-      fileName: ICU_IMAGE_NAME,
-      image: icuImage
-    });
+    for (const location of LOCATIONS) {
+      await publishLocation(channel, location);
+    }
   }
 
   client.once(Events.ClientReady, () => publish().catch((error) => {
