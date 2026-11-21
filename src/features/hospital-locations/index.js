@@ -2,15 +2,18 @@ const { EmbedBuilder, Events } = require("discord.js");
 const { createJsonStore } = require("../../storage");
 const receptionImage = require("./reception-image");
 const floor2Image = require("./floor2-image");
+const icuImage = require("./icu-image");
 
 const CHANNEL_ID = "1573736527434088571";
 const RECEPTION_IMAGE_NAME = "ubicacion-recepcion.jpg";
 const FLOOR2_IMAGE_NAME = "ubicacion-segunda-planta.jpg";
+const ICU_IMAGE_NAME = "ubicacion-cuidados-intensivos.jpg";
 
 function register(client, config) {
   const store = createJsonStore(config.dataDir, "hospital-locations.json", {
     receptionMessageId: null,
-    floor2MessageId: null
+    floor2MessageId: null,
+    icuMessageId: null
   });
 
   async function publishLocation({ messageKey, title, description, fileName, image }) {
@@ -59,6 +62,14 @@ function register(client, config) {
       description: "**Cuidados intensivos, Rayos X, tomografías y quirófanos**\n\nEn esta planta se encuentran las áreas de **Cuidados Intensivos**, **Rayos X**, **Tomografías** y **Quirófanos**.",
       fileName: FLOOR2_IMAGE_NAME,
       image: floor2Image
+    });
+
+    await publishLocation({
+      messageKey: "icuMessageId",
+      title: "🩺 CUIDADOS INTENSIVOS",
+      description: "**Área para pacientes postoperatorios**\n\nSala destinada a la atención y vigilancia de pacientes en periodo **postoperatorio**.",
+      fileName: ICU_IMAGE_NAME,
+      image: icuImage
     });
   }
 
