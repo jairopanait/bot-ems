@@ -22,6 +22,7 @@ const operationsGuidePanels = require("./features/operations-guide-panels");
 const resignationGuide = require("./features/resignation-guide");
 const promotions = require("./features/promotions");
 const roleRemoval = require("./features/role-removal");
+const hospitalLocations = require("./features/hospital-locations");
 
 const client = new Client({
   intents: [
@@ -33,7 +34,7 @@ const client = new Client({
   ]
 });
 
-const features = [birthdays, postulations, faction, inactivity, h50, emsQuestionnaire, resignations, commandLogs, otc, rankRequest, voiceDistribution, noticeRoles, medkitSales, roleCommandsPanel, botGuidePanel, writtenPostulationsGuide, instructionGuide, operationsGuidePanels, resignationGuide, promotions, roleRemoval];
+const features = [birthdays, postulations, faction, inactivity, h50, emsQuestionnaire, resignations, commandLogs, otc, rankRequest, voiceDistribution, noticeRoles, medkitSales, roleCommandsPanel, botGuidePanel, writtenPostulationsGuide, instructionGuide, operationsGuidePanels, resignationGuide, promotions, roleRemoval, hospitalLocations];
 for (const feature of features) feature.register(client, config);
 
 client.once(Events.ClientReady, async (readyClient) => {
