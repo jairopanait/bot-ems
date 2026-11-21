@@ -1,37 +1,70 @@
 const { EmbedBuilder, Events } = require("discord.js");
 const { createJsonStore } = require("../../storage");
 const receptionImage = require("./reception-image");
+const floor2Image = require("./floor2-image");
 
 const CHANNEL_ID = "1573736527434088571";
 const RECEPTION_IMAGE_NAME = "ubicacion-recepcion.jpg";
+const FLOOR2_IMAGE_NAME = "ubicacion-segunda-planta.jpg";
 
 function register(client, config) {
-  const store = createJsonStore(config.dataDir, "hospital-locations.json", { receptionMessageId: null });
+  const store = createJsonStore(config.dataDir, "hospital-locations.json", {
+    receptionMessageId: null,
+    floor2MessageId: null
+  });
 
-  async function publish() {
+  async function publishLocation({ messageKey, title, description, fileName, image }) {
     const channel = await client.channels.fetch(CHANNEL_ID).catch(() => null);
-    if (!channel?.isTextBased() || channel.guildId !== config.guildId) throw new Error("Canal de ubicaciones del hospital no válido.");
+    if (!channel?.isTextBased() || channel.guildId !== config.guildId) {
+      throw new Error("Canal de ubicaciones del hospital no válido.");
+    }
+
     const embed = new EmbedBuilder()
       .setColor(0x7b1113)
-      .setTitle("🏥 RECEPCIÓN")
-      .setDescription("**Acceso a vestuarios y armarios personales**\n\nEs la puerta por donde entramos a los vestuarios y armarios personales.")
-      .setImage("attachment://" + RECEPTION_IMAGE_NAME)
+      .setTitle(title)
+      .setDescription(description)
+      .setImage("attachment://" + fileName)
       .setFooter({ text: "Doctor Salidorro EMS - LaNaranjaRP🍊 · Ubicaciones del hospital" });
+
     const payload = {
       embeds: [embed],
-      files: [{ attachment: Buffer.from(receptionImage, "base64"), name: RECEPTION_IMAGE_NAME }],
+      files: [{ attachment: Buffer.from(image, "base64"), name: fileName }],
       allowedMentions: { parse: [] }
     };
+
     const data = store.read();
-    const existing = data.receptionMessageId ? await channel.messages.fetch(data.receptionMessageId).catch(() => null) : null;
-    // Al adjuntar una imagen, Discord no siempre incorpora archivos nuevos al editar
-    // mensajes ya existentes. Se publica uno nuevo para garantizar que la foto se vea.
+    const existing = data[messageKey]
+      ? await channel.messages.fetch(data[messageKey]).catch(() => null)
+      : null;
+
+    // Discord no siempre adjunta archivos nuevos al editar mensajes existentes.
+    // Se publica uno nuevo para garantizar que la foto se vea.
     if (existing) await existing.delete().catch(() => null);
     const message = await channel.send(payload);
-    store.write({ receptionMessageId: message.id });
+    store.write({ ...data, [messageKey]: message.id });
   }
 
-  client.once(Events.ClientReady, () => publish().catch((error) => console.error("No se pudo publicar la ubicación de Recepción:", error)));
+  async function publish() {
+    await publishLocation({
+      messageKey: "receptionMessageId",
+      title: "🏥 RECEPCIÓN",
+      description: "**Acceso a vestuarios y armarios personales**\n\nEs la puerta por donde entramos a los vestuarios y armarios personales.",
+      fileName: RECEPTION_IMAGE_NAME,
+      image: receptionImage
+    });
+
+    await publishLocation({
+      messageKey: "floor2MessageId",
+      title: "🏢 2ª PLANTA",
+      description: "**Cuidados intensivos, Rayos X, tomografías y quirófanos**\n\nEn esta planta se encuentran las áreas de **Cuidados Intensivos**, **Rayos X**, **Tomografías** y **Quirófanos**.",
+      fileName: FLOOR2_IMAGE_NAME,
+      image: floor2Image
+    });
+  }
+
+  client.once(Events.ClientReady, () => publish().catch((error) => {
+    console.error("No se pudieron publicar las ubicaciones del hospital:", error);
+  }));
 }
 
 module.exports = { name: "ubicaciones del hospital", commands: [], register };
